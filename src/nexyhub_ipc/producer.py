@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import signal
 import random
@@ -62,5 +63,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    import json
     main()

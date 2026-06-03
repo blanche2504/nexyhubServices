@@ -1,5 +1,6 @@
 .venv/
 .ruff_cache/
 reference/
+__pycache__/
 *.tar
 build.sh

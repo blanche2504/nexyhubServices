@@ -150,7 +150,7 @@ HTTP endpoints:
 |-------|-------------|
 | `GET /` | List all keys |
 | `GET /status` | Status (number of files) |
-| `GET /<key>` | Read JSON value by key |
+| `GET /data/<key>` | Read JSON value by key (e.g. `/data/producer/data.json`) |
 
 ### Environment variables
 

@@ -27,8 +27,8 @@ def atomic_read(key: str) -> object | None:
         raise ValueError(f"Invalid JSON in {key}: {e}") from e
 
 
-def list_keys(pattern: str = "*") -> list[str]:
+def list_keys(pattern: str = "**/*.json") -> list[str]:
     try:
-        return sorted(p.name for p in SHARED_DIR.glob(pattern) if p.is_file() and p.suffix == ".json")
+        return sorted(str(p.relative_to(SHARED_DIR)) for p in SHARED_DIR.glob(pattern) if p.is_file())
     except FileNotFoundError:
         return []

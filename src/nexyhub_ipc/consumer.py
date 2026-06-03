@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from nexyhub_ipc.shared_mem import atomic_read, list_keys, SHARED_DIR
 
-CONSUMER_PORT = int(os.environ.get("IPC_CONSUMER_PORT", "8080"))
+CONSUMER_PORT = int(os.environ.get("IPC_CONSUMER_PORT", "8000"))
 
 running = True
 
