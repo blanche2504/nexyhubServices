@@ -1,6 +1,6 @@
-# NexyHub Air — Training Project
+# NexyHub Services
 
-Training containers for NexyHub Air (NXP i.MX93 · OpenWRT 24.10 · Docker).
+Training containers for NexyHub Air, using python and docker.
 
 ## Todo
 
