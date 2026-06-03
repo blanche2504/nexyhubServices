@@ -96,6 +96,73 @@ For tests, see [testing.md](testing.md).
 
 ---
 
+## Epic 4 — BLE Scanner
+
+### Build
+
+```powershell
+docker build -f Dockerfile.ble -t nexyhub-ble .
+```
+
+### Run
+
+```powershell
+docker run --rm nexyhub-ble
+```
+
+Scans BLE devices via `bleak`, outputs JSON to `/mnt/shared/`. See `--help` for options:
+
+```powershell
+docker run --rm nexyhub-ble .venv/bin/nexyhub-ble --help
+```
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BLE_SCAN_SEC` | `10` | Scan duration |
+| `BLE_SCAN_INTERVAL` | `60` | Interval between scans |
+
+---
+
+## Epic 5 — IPC Shared Memory
+
+Two containers sharing `/mnt/shared`: a **producer** writes JSON sensor data, a **consumer** serves it via HTTP.
+
+### Build
+
+```powershell
+docker build -f Dockerfile.ipc -t nexyhub-ipc .
+```
+
+### Run
+
+```powershell
+# Terminal 1 — producer
+docker run --rm -v ipc-data:/mnt/shared nexyhub-ipc .venv/bin/nexyhub-producer
+
+# Terminal 2 — consumer
+docker run --rm -v ipc-data:/mnt/shared -p 8000:8000 nexyhub-ipc .venv/bin/nexyhub-consumer
+```
+
+HTTP endpoints:
+| Route | Description |
+|-------|-------------|
+| `GET /` | List all keys |
+| `GET /status` | Status (number of files) |
+| `GET /<key>` | Read JSON value by key |
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `IPC_DATA_DIR` | `/mnt/shared` | Shared volume path |
+| `IPC_PRODUCER_KEY` | `sensor` | Producer key |
+| `IPC_PRODUCER_INTERVAL` | `5` | Write interval (seconds) |
+| `IPC_CONSUMER_PORT` | `8000` | HTTP server port |
+
+---
+
 ## All Epics
 
 ### Entry points
@@ -107,15 +174,21 @@ For tests, see [testing.md](testing.md).
 | `nexyhub-serial` | `nexyhub_serial.serial_echo:main` | RS-232 echo (Epic 3) |
 | `nexyhub-rs485` | `nexyhub_serial.rs485_echo:main` | RS-485 echo (Epic 3) |
 | `nexyhub-modbus` | `nexyhub_serial.modbus_rtu:main` | Modbus RTU (Epic 3) |
+| `nexyhub-ble` | `nexyhub_ble.ble_scanner:main` | BLE scanner (Epic 4) |
+| `nexyhub-producer` | `nexyhub_ipc.producer:main` | IPC producer (Epic 5) |
+| `nexyhub-consumer` | `nexyhub_ipc.consumer:main` | IPC consumer (Epic 5) |
 
 ### Local development
 
 ```bash
 uv sync
-uv run nexyhub-can       # CAN
-uv run nexyhub-serial    # RS-232
-uv run nexyhub-rs485     # RS-485
-uv run nexyhub-modbus    # Modbus RTU
+uv run nexyhub-can        # CAN
+uv run nexyhub-serial     # RS-232
+uv run nexyhub-rs485      # RS-485
+uv run nexyhub-modbus     # Modbus RTU
+uv run nexyhub-ble        # BLE scanner
+uv run nexyhub-producer   # IPC producer
+uv run nexyhub-consumer   # IPC consumer
 ```
 
 ### SSH
@@ -124,6 +197,8 @@ Development (runtime password):
 ```powershell
 docker run --rm -e SSH_ROOT_PASSWORD=secret nexyhub-can
 docker run --rm -e SSH_ROOT_PASSWORD=secret nexyhub-serial
+docker run --rm -e SSH_ROOT_PASSWORD=secret nexyhub-ble
+docker run --rm -e SSH_ROOT_PASSWORD=secret nexyhub-ipc
 ```
 
 Production (public key — recommended):
@@ -135,5 +210,5 @@ SSH ports: 222 (Slot 1), 223 (Slot 2), 224 (Slot 3), 225 (Slot 4).
 ### Limitations
 
 - Docker Desktop / WSL2: Microsoft kernel without `vcan`. SocketCAN (`AF_CAN`) works, virtual interfaces do not. On NexyHub, `can0` is provided by the platform.
-- Serial devices (`/dev/ttyLP*`, `/dev/gpiochip*`) do not exist on Docker Desktop. Mocks in tests cover all logic.
+- Serial devices (`/dev/ttyLP*`, `/dev/gpiochip*`) and BLE adapter (`/dev/hci0`) do not exist on Docker Desktop. Mocks in tests cover all logic.
 - Two-architecture builds: `linux/amd64` for local testing, `linux/arm64` for NexyHub.
