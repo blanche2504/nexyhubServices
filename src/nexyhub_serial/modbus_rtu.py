@@ -26,7 +26,7 @@ def log(level: str, msg: str) -> None:
 
 def signal_handler(sig, frame) -> None:
     global running
-    log("INFO", f"Ricevuto segnale {sig}, shutdown...")
+    log("INFO", f"Received signal {sig}, shutdown...")
     running = False
 
 
@@ -38,35 +38,35 @@ def wait_for_device(dev: str, timeout: int = 120) -> bool:
     start = time.time()
     while running:
         if os.path.exists(dev):
-            log("INFO", f"Device {dev} trovato")
+            log("INFO", f"Device {dev} found")
             return True
         elapsed = int(time.time() - start)
         if elapsed >= timeout:
-            log("ERROR", f"{dev} non disponibile dopo {timeout}s")
+            log("ERROR", f"{dev} not available after {timeout}s")
             return False
         if elapsed % 10 == 0 and elapsed > 0:
-            log("WAIT", f"Attendo {dev}... ({elapsed}s)")
+            log("WAIT", f"Waiting for {dev}... ({elapsed}s)")
         time.sleep(1)
     return False
 
 
 def main():
-    log("INFO", "=== nexyhub-modbus avviato ===")
-    log("INFO", f"Porta: {SERIAL_PORT} @ {BAUDRATE} baud")
+    log("INFO", "=== nexyhub-modbus started ===")
+    log("INFO", f"Port: {SERIAL_PORT} @ {BAUDRATE} baud")
     log("INFO", f"Slave ID: {SLAVE_ID}, Register: {REGISTER_ADDR}, Count: {REGISTER_COUNT}")
     log("INFO", f"Poll: {POLL_SEC}s")
     log("INFO", f"PID: {os.getpid()}")
 
     if pymodbus is None:
-        log("ERROR", "pymodbus non installato")
+        log("ERROR", "pymodbus not installed")
         return
 
     while running:
-        log("INFO", f"Attendo {SERIAL_PORT}...")
+        log("INFO", f"Waiting for {SERIAL_PORT}...")
         if not wait_for_device(SERIAL_PORT):
             if not running:
                 break
-            log("WARN", f"{SERIAL_PORT} non trovata, riprovo tra 3s...")
+            log("WARN", f"{SERIAL_PORT} not found, retrying in 3s...")
             time.sleep(3)
             continue
 
@@ -78,9 +78,9 @@ def main():
 
         try:
             client.connect()
-            log("INFO", f"Connesso a {SERIAL_PORT}")
+            log("INFO", f"Connected to {SERIAL_PORT}")
         except Exception as e:
-            log("ERROR", f"Connessione fallita: {e}")
+            log("ERROR", f"Connection failed: {e}")
             time.sleep(3)
             continue
 
@@ -94,18 +94,18 @@ def main():
                         values = result.registers
                         log("INFO", f"Register {REGISTER_ADDR}: {values}")
                 except Exception as e:
-                    log("ERROR", f"Lettura fallita: {e}")
+                    log("ERROR", f"Read failed: {e}")
                 time.sleep(POLL_SEC)
         except OSError:
             pass
         finally:
             try:
                 client.close()
-                log("INFO", "Connessione Modbus chiusa")
+                log("INFO", "Modbus connection closed")
             except Exception:
                 pass
 
-    log("INFO", "=== nexyhub-modbus terminato ===")
+    log("INFO", "=== nexyhub-modbus terminated ===")
 
 
 if __name__ == "__main__":

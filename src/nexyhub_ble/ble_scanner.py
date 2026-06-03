@@ -28,7 +28,7 @@ def log(level: str, msg: str) -> None:
 
 def signal_handler(sig, frame) -> None:
     global running
-    log("INFO", f"Ricevuto segnale {sig}, shutdown...")
+    log("INFO", f"Received signal {sig}, shutdown...")
     running = False
 
 
@@ -41,9 +41,9 @@ def write_devices(devices: list, dest: Path) -> None:
     try:
         tmp.write_text(json.dumps(devices, indent=2), encoding="utf-8")
         tmp.rename(dest)
-        log("INFO", f"Scritti {len(devices)} dispositivi su {dest}")
+        log("INFO", f"Wrote {len(devices)} devices to {dest}")
     except Exception as e:
-        log("ERROR", f"Scrittura fallita: {e}")
+        log("ERROR", f"Write failed: {e}")
 
 
 def format_device(device) -> dict:
@@ -57,16 +57,16 @@ def format_device(device) -> dict:
 
 async def scan_once() -> list:
     if BleakScanner is None:
-        log("ERROR", "bleak non installato")
+        log("ERROR", "bleak not installed")
         return []
-    log("INFO", f"Scansione BLE su {BLE_ADAPTER} ({SCAN_SEC}s)...")
+    log("INFO", f"BLE scan on {BLE_ADAPTER} ({SCAN_SEC}s)...")
     try:
         devices = await BleakScanner.discover(timeout=SCAN_SEC, adapter=BLE_ADAPTER)
         result = [format_device(d) for d in devices]
-        log("INFO", f"Trovati {len(result)} dispositivi")
+        log("INFO", f"Found {len(result)} devices")
         return result
     except Exception as e:
-        log("ERROR", f"Scansione fallita: {e}")
+        log("ERROR", f"Scan failed: {e}")
         return []
 
 
@@ -75,26 +75,26 @@ def wait_for_adapter(adapter: str, timeout: int = 120) -> bool:
     while running:
         path = f"/sys/class/bluetooth/{adapter}"
         if os.path.exists(path):
-            log("INFO", f"Adapter {adapter} trovato")
+            log("INFO", f"Adapter {adapter} found")
             return True
         elapsed = int(time.time() - start)
         if elapsed >= timeout:
-            log("ERROR", f"{adapter} non disponibile dopo {timeout}s")
+            log("ERROR", f"{adapter} not available after {timeout}s")
             return False
         if elapsed % 10 == 0 and elapsed > 0:
-            log("WAIT", f"Attendo {adapter}... ({elapsed}s)")
+            log("WAIT", f"Waiting for {adapter}... ({elapsed}s)")
         time.sleep(1)
     return False
 
 
 async def main_loop():
-    log("INFO", "=== nexyhub-ble scanner avviato ===")
+    log("INFO", "=== nexyhub-ble scanner started ===")
     log("INFO", f"Adapter: {BLE_ADAPTER}")
     log("INFO", f"Scan: {SCAN_SEC}s, Poll: {POLL_SEC}s")
     log("INFO", f"Shared dir: {SHARED_DIR}")
 
     if BleakScanner is None:
-        log("ERROR", "Installa bleak: pip install bleak")
+        log("ERROR", "Install bleak: pip install bleak")
         return
 
     if not wait_for_adapter(BLE_ADAPTER):
@@ -107,13 +107,13 @@ async def main_loop():
         if running:
             write_devices(devices, output)
             if running:
-                log("INFO", f"Prossima scansione tra {POLL_SEC}s...")
+                log("INFO", f"Next scan in {POLL_SEC}s...")
                 for _ in range(POLL_SEC):
                     if not running:
                         break
                     await asyncio.sleep(1)
 
-    log("INFO", "=== nexyhub-ble scanner terminato ===")
+    log("INFO", "=== nexyhub-ble scanner terminated ===")
 
 
 def main():

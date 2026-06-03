@@ -24,7 +24,7 @@ def log(level: str, msg: str) -> None:
 
 def signal_handler(sig, frame) -> None:
     global running
-    log("INFO", f"Ricevuto segnale {sig}, shutdown...")
+    log("INFO", f"Received signal {sig}, shutdown...")
     running = False
 
 
@@ -36,21 +36,21 @@ def wait_for_device(dev: str, timeout: int = 120) -> bool:
     start = time.time()
     while running:
         if os.path.exists(dev):
-            log("INFO", f"Device {dev} trovato")
+            log("INFO", f"Device {dev} found")
             return True
         elapsed = int(time.time() - start)
         if elapsed >= timeout:
-            log("ERROR", f"{dev} non disponibile dopo {timeout}s")
+            log("ERROR", f"{dev} not available after {timeout}s")
             return False
         if elapsed % 10 == 0 and elapsed > 0:
-            log("WAIT", f"Attendo {dev}... ({elapsed}s)")
+            log("WAIT", f"Waiting for {dev}... ({elapsed}s)")
         time.sleep(1)
     return False
 
 
 def setup_gpio():
     if gpiod is None:
-        log("WARN", "libgpiod non disponibile, DE control disabilitato")
+        log("WARN", "libgpiod not available, DE control disabled")
         return None
     try:
         chip = gpiod.Chip(GPIO_CHIP)
@@ -59,10 +59,10 @@ def setup_gpio():
             output_value=gpiod.line.Value.INACTIVE,
         )
         req = chip.request_lines(config={GPIO_DE_LINE: config}, consumer="rs485-de")
-        log("INFO", f"GPIO DE su {GPIO_CHIP} linea {GPIO_DE_LINE}")
+        log("INFO", f"GPIO DE on {GPIO_CHIP} line {GPIO_DE_LINE}")
         return req
     except Exception as e:
-        log("WARN", f"GPIO setup fallito: {e}")
+        log("WARN", f"GPIO setup failed: {e}")
         return None
 
 
@@ -85,30 +85,30 @@ def rs485_loop(ser, gpio_req=None) -> None:
                     gpio_req.set_value(GPIO_DE_LINE, gpiod.line.Value.INACTIVE)
                 log("TX", "ESEGUITO")
         except (serial.SerialException, OSError) as e:
-            log("ERROR", f"Errore seriale: {e}")
+            log("ERROR", f"Serial error: {e}")
             break
 
 
 def main():
-    log("INFO", "=== nexyhub-rs485 monitor avviato ===")
-    log("INFO", f"Porta: {SERIAL_PORT} @ {BAUDRATE} baud")
-    log("INFO", f"GPIO: {GPIO_CHIP} linea {GPIO_DE_LINE}")
+    log("INFO", "=== nexyhub-rs485 monitor started ===")
+    log("INFO", f"Port: {SERIAL_PORT} @ {BAUDRATE} baud")
+    log("INFO", f"GPIO: {GPIO_CHIP} line {GPIO_DE_LINE}")
     log("INFO", f"PID: {os.getpid()}")
 
     while running:
-        log("INFO", f"Attendo {SERIAL_PORT}...")
+        log("INFO", f"Waiting for {SERIAL_PORT}...")
         if not wait_for_device(SERIAL_PORT):
             if not running:
                 break
-            log("WARN", f"{SERIAL_PORT} non trovata, riprovo tra 3s...")
+            log("WARN", f"{SERIAL_PORT} not found, retrying in 3s...")
             time.sleep(3)
             continue
 
         try:
             ser = serial.Serial(port=SERIAL_PORT, baudrate=BAUDRATE, timeout=TIMEOUT)
-            log("INFO", f"{SERIAL_PORT} aperta")
+            log("INFO", f"{SERIAL_PORT} opened")
         except serial.SerialException as e:
-            log("ERROR", f"Impossibile aprire {SERIAL_PORT}: {e}")
+            log("ERROR", f"Can't open {SERIAL_PORT}: {e}")
             time.sleep(3)
             continue
 
@@ -121,11 +121,11 @@ def main():
         finally:
             try:
                 ser.close()
-                log("INFO", f"{SERIAL_PORT} chiusa")
+                log("INFO", f"{SERIAL_PORT} closed")
             except Exception:
                 pass
 
-    log("INFO", "=== nexyhub-rs485 monitor terminato ===")
+    log("INFO", "=== nexyhub-rs485 monitor terminated ===")
 
 
 if __name__ == "__main__":

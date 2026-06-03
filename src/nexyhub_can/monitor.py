@@ -20,7 +20,7 @@ def log(level: str, msg: str) -> None:
 
 def signal_handler(sig, frame) -> None:
     global running
-    log("INFO", f"Ricevuto segnale {sig}, shutdown...")
+    log("INFO", f"Received signal {sig}, shutdown...")
     running = False
 
 
@@ -38,13 +38,13 @@ def wait_for_interface(ifname: str, timeout: int = 120) -> bool:
         except OSError:
             elapsed = int(time.time() - start)
             if elapsed >= timeout:
-                log("ERROR", f"{ifname} non disponibile dopo {timeout}s")
+                log("ERROR", f"{ifname} not available after {timeout}s")
                 return False
             if elapsed % 10 == 0 and elapsed > 0:
-                log("WAIT", f"Attendo {ifname}... ({elapsed}s)")
+                log("WAIT", f"Waiting for {ifname}... ({elapsed}s)")
             time.sleep(1)
         except Exception as e:
-            log("ERROR", f"Errore inatteso verifica interfaccia: {e}")
+            log("ERROR", f"Unexpected error checking interface: {e}")
             time.sleep(RETRY_SEC)
     return False
 
@@ -59,7 +59,7 @@ def can_loop(ifname: str, filters: list, bus=None) -> str:
                 continue
 
             if msg.is_error_frame:
-                log("WARN", "Error frame ricevuto")
+                log("WARN", "Error frame received")
                 continue
 
             if msg.is_remote_frame:
@@ -79,43 +79,43 @@ def can_loop(ifname: str, filters: list, bus=None) -> str:
 
     finally:
         bus.shutdown()
-        log("INFO", "Socket CAN chiuso")
+        log("INFO", "CAN socket closed")
 
     return "shutdown" if not running else "reconnect"
 
 
 def main() -> None:
-    log("INFO", "=== nexyhub-can monitor avviato ===")
-    log("INFO", f"Interfaccia: {CAN_INTERFACE}")
+    log("INFO", "=== nexyhub-can monitor started ===")
+    log("INFO", f"Interface: {CAN_INTERFACE}")
     log("INFO", f"Retry: {RETRY_SEC}s")
     log("INFO", f"PID: {os.getpid()}")
 
     filters = parse_filters(FILTER_IDS_STR)
     if filters:
-        log("INFO", f"Filtri attivi: {len(filters)} regole")
+        log("INFO", f"Active filters: {len(filters)} rules")
     else:
-        log("INFO", "Nessun filtro — accetto tutti gli ID")
+        log("INFO", "No filters — accepting all IDs")
 
     while running:
-        log("INFO", f"Attendo {CAN_INTERFACE}...")
+        log("INFO", f"Waiting for {CAN_INTERFACE}...")
         if not wait_for_interface(CAN_INTERFACE):
             if not running:
                 break
-            log("WARN", f"{CAN_INTERFACE} non trovata, riprovo tra {RETRY_SEC}s...")
+            log("WARN", f"{CAN_INTERFACE} not found, retrying in {RETRY_SEC}s...")
             time.sleep(RETRY_SEC)
             continue
 
-        log("INFO", f"{CAN_INTERFACE} disponibile, avvio loop")
+        log("INFO", f"{CAN_INTERFACE} available, starting loop")
 
         result = can_loop(CAN_INTERFACE, filters)
 
         if result == "shutdown":
             break
 
-        log("INFO", f"Riconnessione tra {RETRY_SEC}s...")
+        log("INFO", f"Reconnecting in {RETRY_SEC}s...")
         time.sleep(RETRY_SEC)
 
-    log("INFO", "=== nexyhub-can monitor terminato ===")
+    log("INFO", "=== nexyhub-can monitor terminated ===")
 
 
 if __name__ == "__main__":

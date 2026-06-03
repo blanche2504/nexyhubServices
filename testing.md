@@ -1,14 +1,14 @@
 # Testing
 
-## Panoramica
+## Overview
 
-52 test totali, nessuno richiede hardware reale.
+52 total tests, none require real hardware.
 
-| Suite | File | Test | Copertura |
-|-------|------|------|-----------|
-| CAN unit | `tests/test_can_monitor.py` | 14 | Parsing frame, filtri, socket, protocollo TESTCAN |
-| CAN integration | `tests/can_full_test.py` | 31 | Encoding/decoding, socketpair, error frame, can_loop, ambiente |
-| Serial unit | `tests/test_serial.py` | 7 | RS-232 echo, RS-485 echo, wait_for_device |
+| Suite | File | Tests | Coverage |
+|-------|------|-------|----------|
+| CAN unit | `tests/test_can_monitor.py` | 12 | Frame parsing, filters, socket, TESTCAN protocol |
+| CAN integration | `tests/can_full_test.py` | 24 | Encoding/decoding, virtual bus, error frame, can_loop, environment |
+| Serial unit | `tests/test_serial.py` | 9 | RS-232 echo, RS-485 echo, wait_for_device |
 
 ## CAN — Unit test
 
@@ -16,7 +16,7 @@
 uv run python -m unittest tests/test_can_monitor.py -v
 ```
 
-Testa frame parsing, ID filtri, socket creation, send/recv con protocollo TESTCAN. Tutto mockato (funziona su Windows).
+Tests frame parsing, ID filters, bus creation, send/recv with TESTCAN protocol. All mocked (works on Windows).
 
 ## CAN — Integration test
 
@@ -24,24 +24,15 @@ Testa frame parsing, ID filtri, socket creation, send/recv con protocollo TESTCA
 uv run python tests/can_full_test.py
 ```
 
-Usa `socket.socketpair()` su Linux o mock su Windows. Testa:
-- Frame encoding/decoding
-- Filtri (singolo, range, misto, reversed)
-- Error frame (BUS-OFF, RESTARTED, combinati)
-- `send_frame`, socket creation
-- Protocollo TESTCAN → ESEGUITO via `can_loop()` con mock socket
-- Ambiente (AF_CAN, AF_UNIX, can-utils)
+Uses `can.Bus(interface='virtual')` for loopback. Tests:
+- `can.Message` construction and attributes
+- Filters (single, range, mixed, reversed)
+- `send_message` / `recv_message` helpers
+- Virtual bus send/receive
+- TESTCAN protocol via `can_loop()` with mock bus
+- Environment (AF_CAN, AF_UNIX, can-utils, python-can version)
 
-## CAN — Environment check
-
-```bash
-uv run python tests/can_env_check.py
-
-# Oppure dentro il container:
-docker run --rm --entrypoint python nexyhub-can tests/can_env_check.py
-```
-
-## CAN — Nel container
+## CAN — Inside container
 
 ```bash
 docker run --rm -it nexyhub-can bash
@@ -55,37 +46,37 @@ python3 -m unittest tests/test_can_monitor.py -v
 uv run python -m unittest tests/test_serial.py -v
 ```
 
-Testa RS-232 echo (`TEST232` → `ESEGUITO`), RS-485 echo (`TEST485` → `ESEGUITO`), `wait_for_device`. Tutto mockato con `MockSerial`.
+Tests RS-232 echo (`TEST232` → `ESEGUITO`), RS-485 echo (`TEST485` → `ESEGUITO`), `wait_for_device`. All mocked with `MockSerial`.
 
-## Serial — Nel container
+## Serial — Inside container
 
 ```bash
 docker run --rm -it nexyhub-serial bash
 python3 -m unittest tests/test_serial.py -v
 ```
 
-## Eseguire tutti i test
+## Run all tests
 
 ```bash
 uv run python -m unittest discover tests -v
 ```
 
-## Struttura mock
+## Mock structure
 
-I test usano mock per sostituire le dipendenze hardware:
+Tests use mocks to replace hardware dependencies:
 
-| Libreria | Mock | File test |
-|----------|------|-----------|
-| `socket` (AF_CAN) | `MockSocket` con `unittest.mock.patch` | `test_can_monitor.py` |
+| Library | Mock | Test file |
+|---------|------|-----------|
+| `socket` (AF_CAN) | `unittest.mock.patch` + `MagicMock` | `test_can_monitor.py` |
 | `serial` (pyserial) | `MockSerial` | `test_serial.py` |
 | `os.path.exists` | `@patch("os.path.exists")` | `test_serial.py` |
 
-## Container — Verifica ambiente
+## Container — Environment check
 
 ```bash
-# Verifica SocketCAN
+# Verify SocketCAN
 docker run --rm -it nexyhub-can bash
 python3 -c "import socket; s=socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW); print('SocketCAN OK'); s.close()"
 ```
 
-Limitazione nota: Docker Desktop / WSL2 non supporta `vcan`. AF_CAN è supportato, ma non si possono creare interfacce CAN virtuali. I device seriali (`/dev/ttyLP*`) non esistono su Docker Desktop. Tutta la logica è coperta da mock.
+Note: Docker Desktop / WSL2 does not support `vcan`. AF_CAN is supported but virtual CAN interfaces cannot be created. Serial devices (`/dev/ttyLP*`) do not exist on Docker Desktop. All logic is covered by mocks.

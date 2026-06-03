@@ -43,9 +43,7 @@ def run_tests():
     from nexyhub_can.monitor import can_loop
     import nexyhub_can.monitor as mon
 
-    # ═══════════════════════════════════════════════════════════════
-    # 1. can.Message construction and attributes
-    # ═══════════════════════════════════════════════════════════════
+    # --- 1. can.Message construction and attributes ---
     print("\n1. can.Message construction & attributes")
 
     msg = can.Message(arbitration_id=0x123, data=b"\xDE\xAD\xBE\xEF", is_extended_id=False)
@@ -61,9 +59,7 @@ def run_tests():
     msg_rtr = can.Message(arbitration_id=0x100, is_remote_frame=True, dlc=2)
     check("RTR frame detection", msg_rtr.is_remote_frame)
 
-    # ═══════════════════════════════════════════════════════════════
-    # 2. Filter parsing
-    # ═══════════════════════════════════════════════════════════════
+    # --- 2. Filter parsing ---
     print("\n2. Filter parsing")
 
     check("empty filter", parse_filters("") == [])
@@ -81,9 +77,7 @@ def run_tests():
     f = parse_filters("0x200-0x100")
     check("reversed range", len(f) == 1)
 
-    # ═══════════════════════════════════════════════════════════════
-    # 3. send_message / recv_message helpers
-    # ═══════════════════════════════════════════════════════════════
+    # --- 3. send_message / recv_message helpers ---
     print("\n3. send_message / recv_message helpers")
 
     bus = MagicMock()
@@ -106,9 +100,7 @@ def run_tests():
     rx2 = recv_message(bus)
     check("recv_message returns None on timeout", rx2 is None)
 
-    # ═══════════════════════════════════════════════════════════════
-    # 4. Virtual bus send/receive (pure Python, no hardware)
-    # ═══════════════════════════════════════════════════════════════
+    # --- 4. Virtual bus send/receive (pure Python, no hardware) ---
     print("\n4. Virtual bus send/receive")
 
     try:
@@ -137,9 +129,7 @@ def run_tests():
     except Exception as e:
         print(f"  SKIP virtual bus test: {e}")
 
-    # ═══════════════════════════════════════════════════════════════
-    # 5. can_loop protocol handling (mock bus)
-    # ═══════════════════════════════════════════════════════════════
+    # --- 5. can_loop protocol handling (mock bus) ---
     print("\n5. Protocol handling (can_loop with mock bus)")
 
     def make_mock_bus(frames: list[can.Message]):
@@ -183,9 +173,7 @@ def run_tests():
 
     check("can_loop: non-TESTCAN gets no response", bus2.send.call_count == 0)
 
-    # ═══════════════════════════════════════════════════════════════
-    # 6. Environment capabilities (informational, not counted in FAIL)
-    # ═══════════════════════════════════════════════════════════════
+    # --- 6. Environment capabilities (informational, not counted in FAIL) ---
     print("\n6. Environment capabilities")
 
     import socket
@@ -219,7 +207,5 @@ def run_tests():
 if __name__ == "__main__":
     run_tests()
     total = PASS + FAIL
-    print(f"\n{'=' * 40}")
-    print(f"  {PASS}/{total} passed" + (f"  ({FAIL} failed)" if FAIL else "  All OK!"))
-    print(f"{'=' * 40}")
+    print(f"\n{PASS}/{total} passed" + (f"  ({FAIL} failed)" if FAIL else "  All OK!"))
     sys.exit(0 if FAIL == 0 else 1)

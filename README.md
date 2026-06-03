@@ -1,6 +1,6 @@
 # NexyHub Air — Training Project
 
-Training container per NexyHub Air (NXP i.MX93 · OpenWRT 24.10 · Docker).
+Training containers for NexyHub Air (NXP i.MX93 · OpenWRT 24.10 · Docker).
 
 ## Epic 2 — CAN Bus Monitor
 
@@ -10,7 +10,7 @@ Training container per NexyHub Air (NXP i.MX93 · OpenWRT 24.10 · Docker).
 docker build -f Dockerfile.can -t nexyhub-can .
 ```
 
-Per arm64 (deploy su NexyHub):
+For arm64 (deploy on NexyHub):
 ```powershell
 $env:PLATFORM="linux/arm64"; .\build-can.sh
 ```
@@ -21,24 +21,24 @@ $env:PLATFORM="linux/arm64"; .\build-can.sh
 docker run --rm nexyhub-can
 ```
 
-Output: attende `can0` (su NexyHub fornita dalla piattaforma).
+Output: waits for `can0` (provided by platform on NexyHub).
 ```
-[INFO] === nexyhub-can monitor avviato ===
-[INFO] Interfaccia: can0
-[INFO] Attendo can0...
-[WAIT] Attendo can0... (10s)
+[INFO] === nexyhub-can monitor started ===
+[INFO] Interface: can0
+[INFO] Waiting for can0...
+[WAIT] Waiting for can0... (10s)
 ```
 
-Per test, vedere [testing.md](testing.md).
+For tests, see [testing.md](testing.md).
 
-### Variabili d'ambiente
+### Environment variables
 
-| Variabile | Default | Descrizione |
-|-----------|---------|-------------|
-| `CAN_INTERFACE` | `can0` | Nome interfaccia CAN |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CAN_INTERFACE` | `can0` | CAN interface name |
 | `CAN_BITRATE` | `500000` | Bitrate |
-| `CAN_RETRY_SEC` | `3` | Attesa tra tentativi |
-| `CAN_FILTER_IDS` | `""` | Filtri ID (es. `0x100-0x1FF,0x300`) |
+| `CAN_RETRY_SEC` | `3` | Retry interval |
+| `CAN_FILTER_IDS` | `""` | ID filters (e.g. `0x100-0x1FF,0x300`) |
 
 ---
 
@@ -46,15 +46,15 @@ Per test, vedere [testing.md](testing.md).
 
 ### RS-232 Echo (`/dev/ttyLP6`)
 
-Risponde `ESEGUITO` a `TEST232`.
+Responds `ESEGUITO` to `TEST232`.
 
 ### RS-485 Echo (`/dev/ttyLP2` + `/dev/gpiochip1`)
 
-Risponde `ESEGUITO` a `TEST485` con controllo GPIO DE.
+Responds `ESEGUITO` to `TEST485` with GPIO DE control.
 
 ### Modbus RTU (RS-485)
 
-Polling holding registers su slave Modbus.
+Polling holding registers on Modbus slave.
 
 ### Build
 
@@ -75,32 +75,32 @@ docker run --rm -e SERIAL_PORT=/dev/ttyLP2 nexyhub-serial .venv/bin/nexyhub-rs48
 docker run --rm -e SERIAL_PORT=/dev/ttyLP2 nexyhub-serial .venv/bin/nexyhub-modbus
 ```
 
-Per test, vedere [testing.md](testing.md).
+For tests, see [testing.md](testing.md).
 
-### Variabili d'ambiente
+### Environment variables
 
-| Variabile | Default | Descrizione |
-|-----------|---------|-------------|
-| `SERIAL_PORT` | `/dev/ttyLP6` | Porta seriale |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SERIAL_PORT` | `/dev/ttyLP6` | Serial port |
 | `BAUDRATE` | `9600` | Baud rate |
-| `PARITY` | `N` | Parità (N/E/O) |
-| `STOPBITS` | `1` | Stop bit |
-| `SERIAL_TIMEOUT` | `1.0` | Timeout lettura |
-| `GPIO_CHIP` | `/dev/gpiochip1` | Chip GPIO (RS-485) |
-| `GPIO_DE_LINE` | `2` | Linea DE (RS-485) |
-| `MODBUS_PORT` | `/dev/ttyLP2` | Porta Modbus |
+| `PARITY` | `N` | Parity (N/E/O) |
+| `STOPBITS` | `1` | Stop bits |
+| `SERIAL_TIMEOUT` | `1.0` | Read timeout |
+| `GPIO_CHIP` | `/dev/gpiochip1` | GPIO chip (RS-485) |
+| `GPIO_DE_LINE` | `2` | DE line (RS-485) |
+| `MODBUS_PORT` | `/dev/ttyLP2` | Modbus port |
 | `MODBUS_SLAVE_ID` | `1` | Slave ID |
-| `MODBUS_REGISTER_ADDR` | `0` | Indirizzo registro |
-| `MODBUS_REGISTER_COUNT` | `1` | Numero registri |
-| `MODBUS_POLL_SEC` | `10` | Intervallo polling |
+| `MODBUS_REGISTER_ADDR` | `0` | Register address |
+| `MODBUS_REGISTER_COUNT` | `1` | Register count |
+| `MODBUS_POLL_SEC` | `10` | Poll interval |
 
 ---
 
-## Tutti gli Episodi
+## All Epics
 
-### Entry point
+### Entry points
 
-| Comando | Modulo | Descrizione |
+| Command | Module | Description |
 |---------|--------|-------------|
 | `nexyhub-hello` | `nexyhub_hello:main` | Hello World (Epic 1) |
 | `nexyhub-can` | `nexyhub_can.monitor:main` | CAN monitor (Epic 2) |
@@ -108,32 +108,32 @@ Per test, vedere [testing.md](testing.md).
 | `nexyhub-rs485` | `nexyhub_serial.rs485_echo:main` | RS-485 echo (Epic 3) |
 | `nexyhub-modbus` | `nexyhub_serial.modbus_rtu:main` | Modbus RTU (Epic 3) |
 
-### Sviluppo locale
+### Local development
 
 ```bash
 uv sync
 uv run nexyhub-can       # CAN
 uv run nexyhub-serial    # RS-232
 uv run nexyhub-rs485     # RS-485
-uv run nexyhub-modbus    # Modbus RTU read command
+uv run nexyhub-modbus    # Modbus RTU
 ```
 
 ### SSH
 
-Sviluppo (password a runtime):
+Development (runtime password):
 ```powershell
 docker run --rm -e SSH_ROOT_PASSWORD=secret nexyhub-can
 docker run --rm -e SSH_ROOT_PASSWORD=secret nexyhub-serial
 ```
 
-Produzione (chiave pubblica — raccomandato):
+Production (public key — recommended):
 ```dockerfile
 COPY authorized_keys /home/appuser/.ssh/authorized_keys
 ```
-Porte SSH: 222 (Slot 1), 223 (Slot 2), 224 (Slot 3), 225 (Slot 4).
+SSH ports: 222 (Slot 1), 223 (Slot 2), 224 (Slot 3), 225 (Slot 4).
 
-### Limitazioni
+### Limitations
 
-- Docker Desktop / WSL2: kernel Microsoft senza `vcan`. SocketCAN (`AF_CAN`) funziona, interfacce virtuali no. Sulla NexyHub `can0` è fornita dalla piattaforma.
-- Dispositivi seriali (`/dev/ttyLP*`, `/dev/gpiochip*`) non esistono su Docker Desktop. Mock nei test copre tutta la logica.
-- Build in due architetture: `linux/amd64` per test locale, `linux/arm64` per NexyHub.
+- Docker Desktop / WSL2: Microsoft kernel without `vcan`. SocketCAN (`AF_CAN`) works, virtual interfaces do not. On NexyHub, `can0` is provided by the platform.
+- Serial devices (`/dev/ttyLP*`, `/dev/gpiochip*`) do not exist on Docker Desktop. Mocks in tests cover all logic.
+- Two-architecture builds: `linux/amd64` for local testing, `linux/arm64` for NexyHub.

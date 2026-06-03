@@ -19,7 +19,7 @@ def log(level: str, msg: str) -> None:
 
 def signal_handler(sig, frame) -> None:
     global running
-    log("INFO", f"Ricevuto segnale {sig}, shutdown...")
+    log("INFO", f"Received signal {sig}, shutdown...")
     running = False
 
 
@@ -39,14 +39,14 @@ def wait_for_device(dev: str, timeout: int = 120) -> bool:
     start = time.time()
     while running:
         if os.path.exists(dev):
-            log("INFO", f"Device {dev} trovato")
+            log("INFO", f"Device {dev} found")
             return True
         elapsed = int(time.time() - start)
         if elapsed >= timeout:
-            log("ERROR", f"{dev} non disponibile dopo {timeout}s")
+            log("ERROR", f"{dev} not available after {timeout}s")
             return False
         if elapsed % 10 == 0 and elapsed > 0:
-            log("WAIT", f"Attendo {dev}... ({elapsed}s)")
+            log("WAIT", f"Waiting for {dev}... ({elapsed}s)")
         time.sleep(1)
     return False
 
@@ -64,22 +64,22 @@ def serial_loop(ser) -> None:
                 ser.write(b"ESEGUITO\n")
                 log("TX", "ESEGUITO")
         except (serial.SerialException, OSError) as e:
-            log("ERROR", f"Errore seriale: {e}")
+            log("ERROR", f"Serial error: {e}")
             break
 
 
 def main():
-    log("INFO", "=== nexyhub-serial monitor avviato ===")
-    log("INFO", f"Porta: {SERIAL_PORT} @ {BAUDRATE} baud")
+    log("INFO", "=== nexyhub-serial monitor started ===")
+    log("INFO", f"Port: {SERIAL_PORT} @ {BAUDRATE} baud")
     log("INFO", f"Parity: {PARITY}, Stopbits: {STOPBITS}, Timeout: {TIMEOUT}s")
     log("INFO", f"PID: {os.getpid()}")
 
     while running:
-        log("INFO", f"Attendo {SERIAL_PORT}...")
+        log("INFO", f"Waiting for {SERIAL_PORT}...")
         if not wait_for_device(SERIAL_PORT):
             if not running:
                 break
-            log("WARN", f"{SERIAL_PORT} non trovata, riprovo tra 3s...")
+            log("WARN", f"{SERIAL_PORT} not found, retrying in 3s...")
             time.sleep(3)
             continue
 
@@ -91,9 +91,9 @@ def main():
                 stopbits=stopbits_to_pyserial(STOPBITS),
                 timeout=TIMEOUT,
             )
-            log("INFO", f"{SERIAL_PORT} aperta")
+            log("INFO", f"{SERIAL_PORT} opened")
         except serial.SerialException as e:
-            log("ERROR", f"Impossibile aprire {SERIAL_PORT}: {e}")
+            log("ERROR", f"Can't open {SERIAL_PORT}: {e}")
             time.sleep(3)
             continue
 
@@ -104,11 +104,11 @@ def main():
         finally:
             try:
                 ser.close()
-                log("INFO", f"{SERIAL_PORT} chiusa")
+                log("INFO", f"{SERIAL_PORT} closed")
             except Exception:
                 pass
 
-    log("INFO", "=== nexyhub-serial monitor terminato ===")
+    log("INFO", "=== nexyhub-serial monitor terminated ===")
 
 
 if __name__ == "__main__":

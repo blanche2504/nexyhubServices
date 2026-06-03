@@ -1,39 +1,39 @@
 #!/bin/sh
 
 if [ "${SSH_ENABLED}" != "true" ]; then
-    log "SSH disabilitato (SSH_ENABLED=${SSH_ENABLED})"
+    log "SSH disabled (SSH_ENABLED=${SSH_ENABLED})"
     return 0 2>/dev/null || exit 0
 fi
 
 if [ -z "${SSH_ROOT_PASSWORD}" ]; then
-    log "WARN: SSH_ROOT_PASSWORD non impostata — SSH non verrà avviato"
-    log "WARN: Usa: docker run -e SSH_ROOT_PASSWORD=..."
+    log "WARN: SSH_ROOT_PASSWORD not set — SSH will not start"
+    log "WARN: Use: docker run -e SSH_ROOT_PASSWORD=..."
     return 0 2>/dev/null || exit 0
 fi
 
-log "SSH abilitato sulla porta ${SSH_PORT:-22}"
+log "SSH enabled on port ${SSH_PORT:-22}"
 
 if echo "root:${SSH_ROOT_PASSWORD}" | chpasswd 2>/dev/null; then
-    log "Password root impostata"
+    log "Root password set"
 else
-    log "WARN: chpasswd fallito, SSH potrebbe non funzionare"
+    log "WARN: chpasswd failed, SSH may not work"
 fi
 
 if [ -n "${SSH_PORT}" ] && [ "${SSH_PORT}" != "22" ]; then
     sed -i "s/^Port .*/Port ${SSH_PORT}/" /etc/ssh/sshd_config
-    log "Porta SSH impostata a ${SSH_PORT}"
+    log "SSH port set to ${SSH_PORT}"
 fi
 
 rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub 2>/dev/null
 ssh-keygen -A 2>/dev/null
-log "Host keys generate"
+log "Host keys generated"
 
 /usr/sbin/sshd -D -e &
 SSHD_PID=$!
 
 sleep 0.5
 if kill -0 "$SSHD_PID" 2>/dev/null; then
-    log "SSH server avviato (PID: ${SSHD_PID})"
+    log "SSH server started (PID: ${SSHD_PID})"
 else
-    log "WARN: sshd non è partito, continuo senza SSH"
+    log "WARN: sshd did not start, continuing without SSH"
 fi
