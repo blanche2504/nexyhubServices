@@ -4,11 +4,11 @@ Training containers for NexyHub Air (NXP i.MX93 · OpenWRT 24.10 · Docker).
 
 ## Todo
 
-- [ ] Epic 1 — Hello World (`nexyhub-hello`, `Dockerfile`)
-- [ ] Epic 2 — CAN Bus (`nexyhub-can`, `Dockerfile.can`, 36 tests)
-- [ ] Epic 3 — Serial RS-232 / RS-485 / Modbus (`nexyhub-serial`, `Dockerfile.serial`, 9 tests)
-- [ ] Epic 4 — BLE Scanner (`nexyhub-ble`, `Dockerfile.ble`, 7 tests)
-- [ ] Epic 5 — IPC Shared Memory (`nexyhub-ipc`, `Dockerfile.ipc`, 11 tests)
+- [x] Epic 1 — Hello World (`nexyhub-hello`, `Dockerfile`)
+- [x] Epic 2 — CAN Bus (`nexyhub-can`, `Dockerfile.can`, 36 tests)
+- [x] Epic 3 — Serial RS-232 / RS-485 / Modbus (`nexyhub-serial`, `Dockerfile.serial`, 9 tests)
+- [x] Epic 4 — BLE Scanner (`nexyhub-ble`, `Dockerfile.ble`, 7 tests)
+- [x] Epic 5 — IPC Shared Memory (`nexyhub-ipc`, `Dockerfile.ipc`, 11 tests)
 - [ ] Epic 6 — Resilience & Production Readiness (hardening, restart policy, health checks, runbook)
 
 ---
