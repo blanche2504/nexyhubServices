@@ -5,6 +5,7 @@ Test BLE scanner — works on any platform by mocking bleak.
 import os
 import sys
 import json
+import asyncio
 import unittest
 from unittest.mock import patch, MagicMock, AsyncMock
 from pathlib import Path
@@ -59,10 +60,16 @@ class TestBLEScanner(unittest.TestCase):
             self.assertTrue(dest.exists())
 
     def test_wait_for_adapter_found(self):
-        with patch("os.path.exists", return_value=True):
-            from nexyhub_ble.ble_scanner import wait_for_adapter
-            result = wait_for_adapter("hci0", timeout=1)
-            self.assertTrue(result)
+        import nexyhub_ble.ble_scanner as mod
+        saved_running = mod.running
+        mod.running = True
+        try:
+            with patch("os.path.exists", return_value=True):
+                from nexyhub_ble.ble_scanner import wait_for_adapter
+                result = wait_for_adapter("hci0", timeout=1)
+                self.assertTrue(result)
+        finally:
+            mod.running = saved_running
 
     def test_wait_for_adapter_not_found(self):
         with patch("os.path.exists", return_value=False):
@@ -75,6 +82,54 @@ class TestBLEScanner(unittest.TestCase):
     def test_bleak_import(self):
         from nexyhub_ble.ble_scanner import BleakScanner
         self.assertIsNotNone(BleakScanner)
+
+    @patch("nexyhub_ble.ble_scanner.BleakScanner")
+    def test_scan_once_returns_devices(self, mock_bleak):
+        mock_bleak.discover = AsyncMock(return_value=[
+            FakeDevice(name="S1", address="AA:BB:CC:DD:EE:01", rssi=-60),
+            FakeDevice(name="S2", address="AA:BB:CC:DD:EE:02", rssi=-75),
+        ])
+        from nexyhub_ble.ble_scanner import scan_once
+        result = asyncio.run(scan_once())
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["name"], "S1")
+        self.assertEqual(result[1]["name"], "S2")
+        self.assertEqual(result[0]["rssi"], -60)
+        mock_bleak.discover.assert_awaited_once()
+
+    @patch("nexyhub_ble.ble_scanner.BleakScanner")
+    def test_scan_once_handles_discover_error(self, mock_bleak):
+        mock_bleak.discover = AsyncMock(side_effect=Exception("scan timeout"))
+        from nexyhub_ble.ble_scanner import scan_once
+        result = asyncio.run(scan_once())
+        self.assertEqual(result, [])
+
+    def test_main_loop_scans_and_writes(self):
+        import nexyhub_ble.ble_scanner as mod
+        saved_running = mod.running
+        try:
+            with patch.object(mod, "wait_for_adapter", return_value=True):
+                with patch.object(mod, "BleakScanner") as mock_bleak:
+                    mock_bleak.discover = AsyncMock(return_value=[
+                        FakeDevice(name="B1", address="AA:BB:CC:DD:EE:03"),
+                    ])
+                    with tempfile.TemporaryDirectory() as tmp:
+                        with patch.object(mod, "SHARED_DIR", tmp):
+                            with patch.object(mod, "POLL_SEC", 60):
+                                async def run():
+                                    mod.running = True
+                                    task = asyncio.create_task(mod.main_loop())
+                                    await asyncio.sleep(0.3)
+                                    mod.running = False
+                                    await asyncio.wait_for(task, timeout=3)
+                                asyncio.run(run())
+                                dest = Path(tmp) / "ble_devices.json"
+                                self.assertTrue(dest.exists(), "write_devices should have been called")
+                                data = json.loads(dest.read_text(encoding="utf-8"))
+                                self.assertEqual(len(data), 1)
+                                self.assertEqual(data[0]["name"], "B1")
+        finally:
+            mod.running = saved_running
 
 
 if __name__ == "__main__":

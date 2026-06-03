@@ -5,9 +5,13 @@ Test serial monitor — works on any platform by mocking pyserial.
 import os
 import sys
 import unittest
-from unittest.mock import patch
+import serial
+from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+
+import serial
 
 
 class MockSerial:
@@ -15,19 +19,18 @@ class MockSerial:
         self._buffer = []
         self._written = []
         self._closed = False
-        self._exhausted = False
+        self._raise_on_disconnect = False
 
     def write(self, data):
         self._written.append(data)
         return len(data)
 
     def readline(self):
-        if self._exhausted:
-            raise OSError("device disconnected")
+        if self._raise_on_disconnect:
+            raise serial.SerialException("device disconnected")
         if self._buffer:
             return self._buffer.pop(0)
-        self._exhausted = True
-        raise OSError("device disconnected")
+        raise serial.SerialException("simulated disconnect after buffer exhausted")
 
     def close(self):
         self._closed = True
@@ -40,6 +43,14 @@ class MockSerial:
 
     def __exit__(self, *args):
         self.close()
+
+
+class MockGpioRequest:
+    def __init__(self):
+        self.calls = []  # (line, value) tuples
+
+    def set_value(self, line, value):
+        self.calls.append((line, value))
 
 
 class TestSerialEcho(unittest.TestCase):
@@ -100,6 +111,24 @@ class TestRS485Echo(unittest.TestCase):
         ser._buffer = [b"HELLO\n"]
         rs485_loop(ser)
         self.assertEqual(len(ser._written), 0)
+
+    @patch("nexyhub_serial.rs485_echo.gpiod")
+    def test_rs485_de_toggled_before_write(self, mock_gpiod):
+        mock_gpiod.line.Value.ACTIVE = 1
+        mock_gpiod.line.Value.INACTIVE = 0
+        from nexyhub_serial.rs485_echo import rs485_loop
+
+        gpio_req = MockGpioRequest()
+        ser = MockSerial()
+        ser._buffer = [b"TEST485\n"]
+        rs485_loop(ser, gpio_req)
+        self.assertGreaterEqual(len(ser._written), 1)
+        self.assertIn(b"ESEGUITO", ser._written[0])
+        self.assertIn((2, 1), gpio_req.calls, "DE not set to ACTIVE before write")
+        self.assertIn((2, 0), gpio_req.calls, "DE not set to INACTIVE after write")
+        active_idx = gpio_req.calls.index((2, 1))
+        inactive_idx = gpio_req.calls.index((2, 0))
+        self.assertLess(active_idx, inactive_idx, "DE ACTIVE must happen before INACTIVE")
 
 
 class TestModbusRTU(unittest.TestCase):
