@@ -2,36 +2,6 @@
 
 Training container per NexyHub Air (NXP i.MX93 · OpenWRT 24.10 · Docker).
 
-## Repository
-
-```
-src/
-├── nexyhub_can/             # Epic 2 — CAN Bus Monitor
-│   ├── can_types.py         Parsing frame ISO 11898, error flags
-│   ├── filters.py           Filtri ID (singolo, range, misto)
-│   ├── socketcan.py         SocketCAN raw API (bind, send, recv)
-│   └── monitor.py           Main loop: wait → recv → respond (TESTCAN→ESEGUITO)
-└── nexyhub_serial/          # Epic 3 — Serial Communication
-    ├── serial_echo.py       RS-232 echo: TEST232 → ESEGUITO
-    ├── rs485_echo.py        RS-485 echo con GPIO DE: TEST485 → ESEGUITO
-    └── modbus_rtu.py        Modbus RTU read holding registers (polling)
-
-tests/
-├── test_can_monitor.py     14 unit test CAN (funzionano su Windows)
-├── can_full_test.py        31 integration test CAN (WSL2 + Windows)
-├── can_env_check.py        Verifica ambiente CAN nel container
-├── can_integration.py      Test end-to-end CAN (richiede vcan)
-└── test_serial.py          7 unit test seriale (mock pyserial)
-
-Dockerfile.can              Immagine CAN (Epic 2)
-Dockerfile.serial           Immagine seriale (Epic 3) con pyserial
-entrypoint.sh               Init runner (esegue drop-in in /docker-entrypoint.d/)
-init-ssh.sh                 Drop-in SSH (password runtime)
-init-can.sh                 Drop-in CAN (ip link set can0 up)
-build-can.sh                Build → docker save → .tar CAN
-build-serial.sh             Build → docker save → .tar seriale
-```
-
 ## Epic 2 — CAN Bus Monitor
 
 ### Build
@@ -145,8 +115,7 @@ uv sync
 uv run nexyhub-can       # CAN
 uv run nexyhub-serial    # RS-232
 uv run nexyhub-rs485     # RS-485
-uv run nexyhub-modbus    # Modbus
-uv run ruff check src/   # Lint
+uv run nexyhub-modbus    # Modbus RTU read command
 ```
 
 ### SSH

@@ -1,15 +1,10 @@
 import os
 import time
 import signal
-import errno
-import socket
+import can
 
-from nexyhub_can.can_types import (
-    CAN_ERR_BUSOFF, CAN_ERR_RESTARTED,
-    parse_frame, describe_error_flags,
-)
 from nexyhub_can.filters import parse_filters
-from nexyhub_can.socketcan import create_socket, send_frame, recv_frame
+from nexyhub_can.socketcan import create_bus, send_message, recv_message
 
 CAN_INTERFACE = os.environ.get("CAN_INTERFACE", "can0")
 RETRY_SEC = int(os.environ.get("CAN_RETRY_SEC", "3"))
@@ -37,72 +32,53 @@ def wait_for_interface(ifname: str, timeout: int = 120) -> bool:
     start = time.time()
     while running:
         try:
-            s = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
-            s.bind((ifname,))
-            s.close()
+            bus = can.Bus(interface="socketcan", channel=ifname, receive_own_messages=False)
+            bus.close()
             return True
-        except OSError as e:
-            if e.errno == errno.ENODEV:
-                elapsed = int(time.time() - start)
-                if elapsed >= timeout:
-                    log("ERROR", f"{ifname} non disponibile dopo {timeout}s")
-                    return False
-                if elapsed % 10 == 0 and elapsed > 0:
-                    log("WAIT", f"Attendo {ifname}... ({elapsed}s)")
-                time.sleep(1)
-            elif e.errno == errno.ENETDOWN:
-                log("WAIT", f"{ifname} presente ma DOWN, attendo UP...")
-                time.sleep(1)
-            else:
-                log("ERROR", f"Errore verifica {ifname}: {e}")
-                time.sleep(RETRY_SEC)
+        except OSError:
+            elapsed = int(time.time() - start)
+            if elapsed >= timeout:
+                log("ERROR", f"{ifname} non disponibile dopo {timeout}s")
+                return False
+            if elapsed % 10 == 0 and elapsed > 0:
+                log("WAIT", f"Attendo {ifname}... ({elapsed}s)")
+            time.sleep(1)
         except Exception as e:
             log("ERROR", f"Errore inatteso verifica interfaccia: {e}")
             time.sleep(RETRY_SEC)
     return False
 
 
-def can_loop(ifname: str, filters: list, sock=None) -> str:
-    sock = sock or create_socket(ifname, filters)
-    bus_off_count = 0
+def can_loop(ifname: str, filters: list, bus=None) -> str:
+    bus = bus or create_bus(ifname, filters)
 
     try:
         while running:
-            data = recv_frame(sock)
-            if data is None:
+            msg = recv_message(bus)
+            if msg is None:
                 continue
 
-            frame = parse_frame(data)
-
-            if frame["is_error"]:
-                desc = describe_error_flags(frame["error_flags"])
-                if frame["error_flags"] & CAN_ERR_BUSOFF:
-                    bus_off_count += 1
-                    log("WARN", f"BUS-OFF rilevato (#{bus_off_count})")
-                elif frame["error_flags"] & CAN_ERR_RESTARTED:
-                    log("INFO", "CAN controller RESTARTED")
-                    bus_off_count = 0
-                else:
-                    log("WARN", f"Error frame: {desc}")
+            if msg.is_error_frame:
+                log("WARN", "Error frame ricevuto")
                 continue
 
-            if frame["is_rtr"]:
-                log("RX", f"RTR ID=0x{frame['id']:03X}")
+            if msg.is_remote_frame:
+                log("RX", f"RTR ID=0x{msg.arbitration_id:03X}")
                 continue
 
             try:
-                text = frame["data"].decode("utf-8", errors="ignore").strip("\x00").strip()
+                text = msg.data.decode("utf-8", errors="ignore").strip("\x00").strip()
             except Exception:
-                text = frame["data"].hex()
+                text = msg.data.hex()
 
-            log("RX", f"ID=0x{frame['id']:03X} DLC={frame['dlc']} DATA={text}")
+            log("RX", f"ID=0x{msg.arbitration_id:03X} DLC={msg.dlc} DATA={text}")
 
             if "TESTCAN" in text.upper():
-                if send_frame(sock, frame["id"], b"ESEGUITO"):
-                    log("TX", f"ID=0x{frame['id']:03X} DATA=ESEGUITO")
+                if send_message(bus, msg.arbitration_id, b"ESEGUITO"):
+                    log("TX", f"ID=0x{msg.arbitration_id:03X} DATA=ESEGUITO")
 
     finally:
-        sock.close()
+        bus.shutdown()
         log("INFO", "Socket CAN chiuso")
 
     return "shutdown" if not running else "reconnect"

@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "pyserial>=3.5",
+    "pymodbus>=3.8",
+    "bleak>=0.22",
+    "python-can>=4.5.0",
 ]
 
 [project.scripts]
@@ -14,6 +17,7 @@ nexyhub-can = "nexyhub_can.monitor:main"
 nexyhub-serial = "nexyhub_serial.serial_echo:main"
 nexyhub-rs485 = "nexyhub_serial.rs485_echo:main"
 nexyhub-modbus = "nexyhub_serial.modbus_rtu:main"
+nexyhub-ble = "nexyhub_ble.ble_scanner:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -21,5 +25,6 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.3",
     "ruff>=0.15.15",
 ]

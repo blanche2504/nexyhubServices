@@ -102,5 +102,20 @@ class TestRS485Echo(unittest.TestCase):
         self.assertEqual(len(ser._written), 0)
 
 
+class TestModbusRTU(unittest.TestCase):
+    def test_modbus_import(self):
+        from nexyhub_serial.modbus_rtu import pymodbus
+        self.assertIsNotNone(pymodbus, "pymodbus should be importable")
+
+    def test_modbus_main_no_device(self):
+        import nexyhub_serial.modbus_rtu as mod
+        mod.running = False
+        with patch("os.path.exists", return_value=False):
+            try:
+                mod.main()
+            except Exception as e:
+                self.fail(f"main() raised {e}")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
