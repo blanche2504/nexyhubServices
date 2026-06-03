@@ -2,17 +2,14 @@
 
 Training containers for NexyHub Air (NXP i.MX93 · OpenWRT 24.10 · Docker).
 
-## Overview
+## Todo
 
-| # | Epic | Image | Dockerfile | Entry points | Tests | Status |
-|---|------|-------|------------|-------------|-------|--------|
-| 1 | Hello World | `nexyhub-hello` | `Dockerfile` | `nexyhub-hello` | — | ✅ |
-| 2 | CAN Bus | `nexyhub-can` | `Dockerfile.can` | `nexyhub-can` | 36 | ✅ |
-| 3 | Serial (RS-232/RS-485/Modbus) | `nexyhub-serial` | `Dockerfile.serial` | `nexyhub-serial`, `nexyhub-rs485`, `nexyhub-modbus` | 9 | ✅ |
-| 4 | BLE Scanner | `nexyhub-ble` | `Dockerfile.ble` | `nexyhub-ble` | 7 | ✅ |
-| 5 | IPC Shared Memory | `nexyhub-ipc` | `Dockerfile.ipc` | `nexyhub-producer`, `nexyhub-consumer` | 11 | ✅ |
-
-**Total: 63 tests** (39 unit + 24 integration), all pass without hardware.
+- [ ] Epic 1 — Hello World (`nexyhub-hello`, `Dockerfile`)
+- [ ] Epic 2 — CAN Bus (`nexyhub-can`, `Dockerfile.can`, 36 tests)
+- [ ] Epic 3 — Serial RS-232 / RS-485 / Modbus (`nexyhub-serial`, `Dockerfile.serial`, 9 tests)
+- [ ] Epic 4 — BLE Scanner (`nexyhub-ble`, `Dockerfile.ble`, 7 tests)
+- [ ] Epic 5 — IPC Shared Memory (`nexyhub-ipc`, `Dockerfile.ipc`, 11 tests)
+- [ ] Epic 6 — Resilience & Production Readiness (hardening, restart policy, health checks, runbook)
 
 ---
 
