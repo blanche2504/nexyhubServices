@@ -1,0 +1,19 @@
+[project]
+name = "nexyhub-hello"
+version = "0.1.0"
+description = "NexyHub Air Hello World container"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+nexyhub-hello = "nexyhub_hello:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.15",
+]

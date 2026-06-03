@@ -1,0 +1,6 @@
+.venv/
+.ruff_cache/
+reference/
+*.tar
+README.md
+build.sh
