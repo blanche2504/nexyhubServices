@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 LABEL maintainer="developer"
-LABEL description="NexyHub Hello World — Epic 1"
+LABEL description="NexyHub Serial Communication — RS-232 / RS-485 / Modbus RTU (Epic 3)"
 LABEL version="0.1.0"
 
 COPY entrypoint.sh /entrypoint.sh
@@ -10,6 +10,7 @@ RUN chmod +x /entrypoint.sh \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-server \
+    iproute2 \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /var/run/sshd
 
@@ -34,6 +35,11 @@ RUN uv sync --no-dev --frozen
 
 ENV PYTHONUNBUFFERED=1
 ENV SSH_ROOT_PASSWORD=""
+ENV SERIAL_PORT=/dev/ttyLP6
+ENV BAUDRATE=9600
+ENV PARITY=N
+ENV STOPBITS=1
+ENV SERIAL_TIMEOUT=1.0
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["./.venv/bin/nexyhub-hello"]
+CMD ["./.venv/bin/nexyhub-serial"]

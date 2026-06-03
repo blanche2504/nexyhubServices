@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 LABEL maintainer="developer"
-LABEL description="NexyHub Hello World — Epic 1"
+LABEL description="NexyHub CAN Bus Monitor — Epic 2"
 LABEL version="0.1.0"
 
 COPY entrypoint.sh /entrypoint.sh
@@ -10,6 +10,7 @@ RUN chmod +x /entrypoint.sh \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-server \
+    iproute2 \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /var/run/sshd
 
@@ -17,8 +18,16 @@ COPY sshd_config /etc/ssh/sshd_config
 COPY init-ssh.sh /docker-entrypoint.d/00-ssh.sh
 RUN chmod +x /docker-entrypoint.d/00-ssh.sh
 
+COPY init-can.sh /docker-entrypoint.d/05-can.sh
+RUN chmod +x /docker-entrypoint.d/05-can.sh
+
 ENV SSH_ENABLED=true
 ENV SSH_PORT=22
+ENV CAN_INTERFACE=can0
+ENV CAN_BITRATE=500000
+ENV CAN_RESTART_MS=100
+ENV CAN_RETRY_SEC=3
+ENV CAN_FILTER_IDS=
 
 EXPOSE 22
 
@@ -36,4 +45,4 @@ ENV PYTHONUNBUFFERED=1
 ENV SSH_ROOT_PASSWORD=""
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["./.venv/bin/nexyhub-hello"]
+CMD ["./.venv/bin/nexyhub-can"]

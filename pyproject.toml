@@ -4,10 +4,16 @@ version = "0.1.0"
 description = "NexyHub Air Hello World container"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "pyserial>=3.5",
+]
 
 [project.scripts]
 nexyhub-hello = "nexyhub_hello:main"
+nexyhub-can = "nexyhub_can.monitor:main"
+nexyhub-serial = "nexyhub_serial.serial_echo:main"
+nexyhub-rs485 = "nexyhub_serial.rs485_echo:main"
+nexyhub-modbus = "nexyhub_serial.modbus_rtu:main"
 
 [build-system]
 requires = ["hatchling"]
