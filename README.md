@@ -2,6 +2,20 @@
 
 Training containers for NexyHub Air (NXP i.MX93 · OpenWRT 24.10 · Docker).
 
+## Overview
+
+| # | Epic | Image | Dockerfile | Entry points | Tests | Status |
+|---|------|-------|------------|-------------|-------|--------|
+| 1 | Hello World | `nexyhub-hello` | `Dockerfile` | `nexyhub-hello` | — | ✅ |
+| 2 | CAN Bus | `nexyhub-can` | `Dockerfile.can` | `nexyhub-can` | 36 | ✅ |
+| 3 | Serial (RS-232/RS-485/Modbus) | `nexyhub-serial` | `Dockerfile.serial` | `nexyhub-serial`, `nexyhub-rs485`, `nexyhub-modbus` | 9 | ✅ |
+| 4 | BLE Scanner | `nexyhub-ble` | `Dockerfile.ble` | `nexyhub-ble` | 7 | ✅ |
+| 5 | IPC Shared Memory | `nexyhub-ipc` | `Dockerfile.ipc` | `nexyhub-producer`, `nexyhub-consumer` | 11 | ✅ |
+
+**Total: 63 tests** (39 unit + 24 integration), all pass without hardware.
+
+---
+
 ## Epic 2 — CAN Bus Monitor
 
 ### Build
@@ -156,9 +170,9 @@ HTTP endpoints:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `IPC_DATA_DIR` | `/mnt/shared` | Shared volume path |
-| `IPC_PRODUCER_KEY` | `sensor` | Producer key |
-| `IPC_PRODUCER_INTERVAL` | `5` | Write interval (seconds) |
+| `IPC_SHARED_DIR` | `/mnt/shared` | Shared volume path |
+| `IPC_PRODUCER_KEY` | `producer/data.json` | Producer key |
+| `IPC_INTERVAL_SEC` | `5` | Write interval (seconds) |
 | `IPC_CONSUMER_PORT` | `8000` | HTTP server port |
 
 ---
