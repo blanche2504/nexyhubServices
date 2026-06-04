@@ -1,0 +1,29 @@
+# nexyhub default config
+# override by mounting /etc/nexyhub/config.yaml
+
+can:
+  interface: can0
+  bitrate: 500000
+  filters: []
+
+serial:
+  rs232:
+    port: /dev/ttyLP6
+    baudrate: 9600
+    parity: N
+    stopbits: 1
+  rs485:
+    port: /dev/ttyLP2
+    baudrate: 9600
+
+ble:
+  adapter: hci0
+  scan_sec: 10
+  poll_sec: 10
+
+alarms: []
+
+logging:
+  db_path: /mnt/shared/nexyhub.db
+  retention_days: 30
+  batch_interval: 10

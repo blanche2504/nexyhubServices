@@ -166,7 +166,7 @@ def run_tests():
     else:
         check("can_loop: TESTCAN sent ACK", False, "no response sent")
 
-    # Test: receive non-TESTCAN frame, expect no response
+    # Test: receive non TESTCAN frame, expect no response
     mon.running = True
     bus2 = make_mock_bus([can.Message(arbitration_id=0x100, data=b"HELLO")])
     result_holder2 = []

@@ -6,12 +6,15 @@ import asyncio
 import argparse
 from pathlib import Path
 
+from nexyhub_config.loader import load_config
+from nexyhub_db.database import Database
+
 BLE_ADAPTER = os.environ.get("BLE_ADAPTER", "hci0")
 SCAN_SEC = int(os.environ.get("BLE_SCAN_SEC", "10"))
 SHARED_DIR = os.environ.get("BLE_SHARED_DIR", "/mnt/shared")
 POLL_SEC = int(os.environ.get("BLE_POLL_SEC", "10"))
 
-DESCRIPTION = "NexyHub BLE Scanner — periodic Bluetooth Low Energy discovery"
+DESCRIPTION = "NexyHub BLE Scanner --- periodic Bluetooth Low Energy discovery"
 
 running = True
 
@@ -87,7 +90,7 @@ def wait_for_adapter(adapter: str, timeout: int = 120) -> bool:
     return False
 
 
-async def main_loop():
+async def main_loop(db=None):
     log("INFO", "=== nexyhub-ble scanner started ===")
     log("INFO", f"Adapter: {BLE_ADAPTER}")
     log("INFO", f"Scan: {SCAN_SEC}s, Poll: {POLL_SEC}s")
@@ -106,6 +109,9 @@ async def main_loop():
         devices = await scan_once()
         if running:
             write_devices(devices, output)
+            if db:
+                for d in devices:
+                    db.insert_reading("ble", d["address"], text_value=d["name"])
             if running:
                 log("INFO", f"Next scan in {POLL_SEC}s...")
                 for _ in range(POLL_SEC):
@@ -129,7 +135,18 @@ def main():
     POLL_SEC = args.poll_sec
     SHARED_DIR = args.shared_dir
 
-    asyncio.run(main_loop())
+    cfg = load_config()
+    db = None
+    try:
+        db = Database(cfg.logging_db_path)
+        log("INFO", f"DB logging to {cfg.logging_db_path}")
+    except Exception as e:
+        log("WARN", f"DB init failed: {e}")
+
+    asyncio.run(main_loop(db=db))
+
+    if db:
+        db.close()
 
 
 if __name__ == "__main__":

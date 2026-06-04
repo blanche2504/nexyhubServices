@@ -20,6 +20,8 @@ RUN chmod +x /docker-entrypoint.d/00-ssh.sh
 ENV SSH_ENABLED=true
 ENV SSH_PORT=22
 
+COPY config.yaml /etc/nexyhub/config.yaml
+
 EXPOSE 22
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv

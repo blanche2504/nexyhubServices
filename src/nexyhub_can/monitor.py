@@ -5,6 +5,10 @@ import can
 
 from nexyhub_can.filters import parse_filters
 from nexyhub_can.socketcan import create_bus, send_message, recv_message
+from nexyhub_config.loader import load_config
+from nexyhub_db.database import Database
+from nexyhub_alarms.engine import AlarmEngine
+from nexyhub_alarms.rules import AlarmRule
 
 CAN_INTERFACE = os.environ.get("CAN_INTERFACE", "can0")
 RETRY_SEC = int(os.environ.get("CAN_RETRY_SEC", "3"))
@@ -49,7 +53,7 @@ def wait_for_interface(ifname: str, timeout: int = 120) -> bool:
     return False
 
 
-def can_loop(ifname: str, filters: list, bus=None) -> str:
+def can_loop(ifname: str, filters: list, bus=None, db=None, alarm_engine=None) -> str:
     bus = bus or create_bus(ifname, filters)
 
     try:
@@ -71,11 +75,25 @@ def can_loop(ifname: str, filters: list, bus=None) -> str:
             except Exception:
                 text = msg.data.hex()
 
-            log("RX", f"ID=0x{msg.arbitration_id:03X} DLC={msg.dlc} DATA={text}")
+            key = f"id=0x{msg.arbitration_id:03X}"
+            log("RX", f"{key} DLC={msg.dlc} DATA={text}")
+
+            if db:
+                db.insert_reading("can", key, text_value=text)
 
             if "TESTCAN" in text.upper():
                 if send_message(bus, msg.arbitration_id, b"ACK"):
-                    log("TX", f"ID=0x{msg.arbitration_id:03X} DATA=ACK")
+                    log("TX", f"{key} DATA=ACK")
+                    if db:
+                        db.insert_reading("can", f"{key}.ack", text_value="ACK")
+
+            if alarm_engine:
+                data = {"can": {key: text}}
+                events = alarm_engine.evaluate(data)
+                for e in events:
+                    log(e["severity"].upper(), e["message"])
+                    if db:
+                        db.insert_alarm(e["name"], e["severity"], e["message"])
 
     finally:
         bus.shutdown()
@@ -85,29 +103,52 @@ def can_loop(ifname: str, filters: list, bus=None) -> str:
 
 
 def main() -> None:
+    cfg = load_config()
+    db_path = cfg.logging_db_path
+    can_iface = cfg.can_interface or CAN_INTERFACE
+
+    db = None
+    try:
+        db = Database(db_path)
+        log("INFO", f"DB logging to {db_path}")
+    except Exception as e:
+        log("WARN", f"DB init failed: {e}")
+
+    alarm_engine = AlarmEngine()
+    for a in cfg.alarms:
+        try:
+            rule = AlarmRule(**{k: v for k, v in a.items() if k in ["name", "source", "field", "min", "max", "hysteresis", "severity"]})
+            alarm_engine.add_rule(rule)
+        except Exception as e:
+            log("WARN", f"Alarm rule '{a.get('name', '?')}' skipped: {e}")
+    if alarm_engine.rules:
+        log("INFO", f"Loaded {len(alarm_engine.rules)} alarm rules")
+    else:
+        log("INFO", "No alarm rules configured")
+
     log("INFO", "=== nexyhub-can monitor started ===")
-    log("INFO", f"Interface: {CAN_INTERFACE}")
+    log("INFO", f"Interface: {can_iface}")
     log("INFO", f"Retry: {RETRY_SEC}s")
     log("INFO", f"PID: {os.getpid()}")
 
     filters = parse_filters(FILTER_IDS_STR)
     if filters:
-        log("INFO", f"Active filters: {len(filters)} rules")
+        log("INFO", f"CAN filters: {len(filters)} rules")
     else:
-        log("INFO", "No filters — accepting all IDs")
+        log("INFO", "No CAN filters — accepting all IDs")
 
     while running:
-        log("INFO", f"Waiting for {CAN_INTERFACE}...")
-        if not wait_for_interface(CAN_INTERFACE):
+        log("INFO", f"Waiting for {can_iface}...")
+        if not wait_for_interface(can_iface):
             if not running:
                 break
-            log("WARN", f"{CAN_INTERFACE} not found, retrying in {RETRY_SEC}s...")
+            log("WARN", f"{can_iface} not found, retrying in {RETRY_SEC}s...")
             time.sleep(RETRY_SEC)
             continue
 
-        log("INFO", f"{CAN_INTERFACE} available, starting loop")
+        log("INFO", f"{can_iface} available, starting loop")
 
-        result = can_loop(CAN_INTERFACE, filters)
+        result = can_loop(can_iface, filters, db=db, alarm_engine=alarm_engine)
 
         if result == "shutdown":
             break
@@ -115,6 +156,8 @@ def main() -> None:
         log("INFO", f"Reconnecting in {RETRY_SEC}s...")
         time.sleep(RETRY_SEC)
 
+    if db:
+        db.close()
     log("INFO", "=== nexyhub-can monitor terminated ===")
 
 

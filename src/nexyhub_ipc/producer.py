@@ -5,6 +5,8 @@ import signal
 import random
 
 from nexyhub_ipc.shared_mem import atomic_write, SHARED_DIR
+from nexyhub_config.loader import load_config
+from nexyhub_db.database import Database
 
 PRODUCER_KEY = os.environ.get("IPC_PRODUCER_KEY", "producer/data.json")
 INTERVAL_SEC = int(os.environ.get("IPC_INTERVAL_SEC", "5"))
@@ -40,6 +42,15 @@ def generate_sample() -> dict:
 
 
 def main() -> None:
+    cfg = load_config()
+
+    db = None
+    try:
+        db = Database(cfg.logging_db_path)
+        log("INFO", f"DB logging to {cfg.logging_db_path}")
+    except Exception as e:
+        log("WARN", f"DB init failed: {e}")
+
     log("INFO", "=== nexyhub-ipc producer started ===")
     log("INFO", f"Shared dir: {SHARED_DIR}")
     log("INFO", f"Key: {PRODUCER_KEY}")
@@ -54,11 +65,17 @@ def main() -> None:
         except OSError as e:
             log("ERROR", f"Write failed: {e}")
 
+        if db:
+            for r in data.get("readings", []):
+                db.insert_reading("producer", r["sensor"], value=r["value"], unit=r.get("unit"))
+
         for _ in range(INTERVAL_SEC):
             if not running:
                 break
             time.sleep(1)
 
+    if db:
+        db.close()
     log("INFO", "=== nexyhub-ipc producer terminated ===")
 
 

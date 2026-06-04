@@ -29,6 +29,8 @@ ENV CAN_RESTART_MS=100
 ENV CAN_RETRY_SEC=3
 ENV CAN_FILTER_IDS=
 
+COPY config.yaml /etc/nexyhub/config.yaml
+
 EXPOSE 22
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv

@@ -3,6 +3,11 @@ import time
 import signal
 import serial
 
+from nexyhub_config.loader import load_config
+from nexyhub_db.database import Database
+from nexyhub_alarms.engine import AlarmEngine
+from nexyhub_alarms.rules import AlarmRule
+
 SERIAL_PORT = os.environ.get("SERIAL_PORT", "/dev/ttyLP2")
 BAUDRATE = int(os.environ.get("BAUDRATE", "9600"))
 TIMEOUT = float(os.environ.get("SERIAL_TIMEOUT", "1.0"))
@@ -66,7 +71,7 @@ def setup_gpio():
         return None
 
 
-def rs485_loop(ser, gpio_req=None) -> None:
+def rs485_loop(ser, gpio_req=None, db=None, alarm_engine=None) -> None:
     while running:
         try:
             data = ser.readline()
@@ -74,6 +79,9 @@ def rs485_loop(ser, gpio_req=None) -> None:
                 continue
             text = data.decode("utf-8", errors="ignore").strip("\x00").strip()
             log("RX", text)
+
+            if db:
+                db.insert_reading("serial", "rs485", text_value=text)
 
             if "TEST485" in text.upper():
                 if gpio_req is not None and gpiod is not None:
@@ -84,12 +92,42 @@ def rs485_loop(ser, gpio_req=None) -> None:
                 if gpio_req is not None and gpiod is not None:
                     gpio_req.set_value(GPIO_DE_LINE, gpiod.line.Value.INACTIVE)
                 log("TX", "ACK")
+                if db:
+                    db.insert_reading("serial", "rs485.ack", text_value="ACK")
+
+            if alarm_engine:
+                events = alarm_engine.evaluate({"serial": {"rs485": text}})
+                for e in events:
+                    log(e["severity"].upper(), e["message"])
+                    if db:
+                        db.insert_alarm(e["name"], e["severity"], e["message"])
+
         except (serial.SerialException, OSError) as e:
             log("ERROR", f"Serial error: {e}")
             break
 
 
 def main():
+    cfg = load_config()
+    db_path = cfg.logging_db_path
+
+    db = None
+    try:
+        db = Database(db_path)
+        log("INFO", f"DB logging to {db_path}")
+    except Exception as e:
+        log("WARN", f"DB init failed: {e}")
+
+    alarm_engine = AlarmEngine()
+    for a in cfg.alarms:
+        try:
+            rule = AlarmRule(**{k: v for k, v in a.items() if k in ["name", "source", "field", "min", "max", "hysteresis", "severity"]})
+            alarm_engine.add_rule(rule)
+        except Exception as e:
+            log("WARN", f"Alarm rule '{a.get('name', '?')}' skipped: {e}")
+    if alarm_engine.rules:
+        log("INFO", f"Loaded {len(alarm_engine.rules)} alarm rules")
+
     log("INFO", "=== nexyhub-rs485 monitor started ===")
     log("INFO", f"Port: {SERIAL_PORT} @ {BAUDRATE} baud")
     log("INFO", f"GPIO: {GPIO_CHIP} line {GPIO_DE_LINE}")
@@ -115,7 +153,7 @@ def main():
         gpio_req = setup_gpio()
 
         try:
-            rs485_loop(ser, gpio_req)
+            rs485_loop(ser, gpio_req, db=db, alarm_engine=alarm_engine)
         except OSError:
             pass
         finally:
@@ -125,6 +163,8 @@ def main():
             except Exception:
                 pass
 
+    if db:
+        db.close()
     log("INFO", "=== nexyhub-rs485 monitor terminated ===")
 
 
