@@ -24,17 +24,31 @@ build_all() {
     docker build -t nexyhub-ipc -f src/nexyhub-aggregator/Dockerfile .
 }
 
+export_all() {
+    echo "exporting images to .tar..."
+    docker save -o nexyhub-can.tar nexyhub-can
+    docker save -o nexyhub-serial.tar nexyhub-serial
+    docker save -o nexyhub-ble.tar nexyhub-ble
+    docker save -o nexyhub-ipc.tar nexyhub-ipc
+    echo ""
+    echo "=== exported tars ==="
+    ls -lh nexyhub-*.tar
+    echo ""
+    echo "upload each .tar via LuCI web interface → Container panel"
+}
+
 run_can() {
-    echo "starting CAN monitor..."
-    # use --network host to access host vcan/can interfaces
-    # in production the platform handles this
+    local net="${CAN_NETWORK:-bridge}"
+    echo "starting CAN monitor (network: ${net})..."
+    echo "  production: use bridge (platform maps can0)"
+    echo "  local dev:  CAN_NETWORK=host to reach vcan0"
     docker run -d --rm \
         --name nexyhub-can \
-        --network host \
+        --network "${net}" \
         -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
         -v "${SHARED_DIR}:/mnt/shared" \
         -e SSH_ROOT_PASSWORD=nexyhub \
-        -e CAN_INTERFACE="${CAN_INTERFACE:-vcan0}" \
+        -e CAN_INTERFACE="${CAN_INTERFACE:-can0}" \
         nexyhub-can
 }
 
@@ -50,6 +64,18 @@ run_serial() {
         -e SSH_ROOT_PASSWORD=nexyhub \
         -e SERIAL_PORT="${port}" \
         nexyhub-serial
+}
+
+run_ble() {
+    echo "starting BLE scanner..."
+    docker run -d --rm \
+        --name nexyhub-ble \
+        --network bridge \
+        -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
+        -v "${SHARED_DIR}:/mnt/shared" \
+        -v /run/dbus:/run/dbus \
+        -e SSH_ROOT_PASSWORD=nexyhub \
+        nexyhub-ble
 }
 
 run_simulate() {
@@ -92,6 +118,7 @@ logs() {
 
 case "${1:-help}" in
     build) build_all ;;
+    export) export_all ;;
     can) run_can ;;
     serial) run_serial ;;
     ble) run_ble ;;
@@ -104,6 +131,7 @@ case "${1:-help}" in
         echo ""
         echo "commands:"
         echo "  build        build all docker images"
+        echo "  export       export images to .tar for LuCI upload"
         echo "  can          start CAN monitor (slot 1)"
         echo "  serial       start RS-232/485 + Modbus (slot 2)"
         echo "  ble          start BLE scanner (slot 3)"
@@ -111,5 +139,10 @@ case "${1:-help}" in
         echo "  simulate     run elevator data simulator"
         echo "  stop         stop all containers"
         echo "  logs <name>  tail logs for a container"
+        echo ""
+        echo "env:"
+        echo "  CAN_NETWORK=host    (default: bridge, use host for local vcan)"
+        echo "  CAN_INTERFACE=vcan0 (default: can0)"
+        echo "  SERIAL_PORT=...     (default: /dev/ttyLP6)"
         ;;
 esac

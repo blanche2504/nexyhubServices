@@ -1,41 +1,49 @@
-# NexyHub BLE Scanner — Container per sviluppatori
+# nexyhub-ble v1.0 — BLE scanner (slot 3)
 
-Container BLE scanner per **NexyHub Air**. Utilizza la libreria `bleak` per eseguire scansioni Bluetooth Low Energy periodiche e scrive i risultati in memoria condivisa (shared memory).
-
-## Mount richiesti
-
-| Mount host          | Mount container |
-|---------------------|-----------------|
-| `/run/dbus`         | `/run/dbus`     |
-
-## Variabili d'ambiente
-
-| Variabile          | Default  | Descrizione                     |
-|--------------------|----------|---------------------------------|
-| `BLE_ADAPTER`      | `hci0`   | Adattatore BLE                  |
-| `BLE_SCAN_SEC`     | `10`     | Durata scansione (secondi)      |
-| `BLE_POLL_SEC`     | `10`     | Intervallo tra scansioni        |
-| `BLE_SHARED_DIR`   | `/mnt/shared` | Directory output condivisa |
-| `SSH_ENABLED`      | `true`   | Abilita server SSH              |
-| `SSH_PORT`         | `22`     | Porta SSH                       |
-| `SSH_ROOT_PASSWORD`| `""`     | Password root per SSH           |
+Container BLE scanner per NexyHub Air. Usa `bleak` per scansioni periodiche e scrive
+`ble_devices.json` nella memoria condivisa.
 
 ## Build
 
 ```bash
-docker build -t nexyhub-ble:dev ./developer-ble-1.0
+# from repo root
+docker build -t nexyhub-ble -f src/nexyhub-ble/Dockerfile .
+
+# cross-compile per ARM64
+PLATFORM=linux/arm64 sh src/nexyhub-ble/build.sh
 ```
 
-## Esecuzione
+## Run (locale)
 
 ```bash
-docker run -d \
-  --name nexyhub-ble \
-  --network host \
-  --privileged \
-  -v /run/dbus:/run/dbus \
-  -e SSH_ROOT_PASSWORD=mypass \
-  nexyhub-ble:dev
+bash run.sh ble
 ```
 
-Il container esegue `python3 -m nexyhub_ble.ble_scanner` e scrive il file `ble_devices.json` nella directory condivisa (`/mnt/shared`).
+## LuCI — configurazione slot
+
+| parametro | valore |
+|-----------|--------|
+| Immagine | `nexyhub-ble.tar` |
+| Rete | bridge |
+| Porte | `224:22` (SSH) |
+| Volumi | volume condiviso → `/mnt/shared`, config → `/etc/nexyhub/config.yaml:ro`, `/run/dbus:/run/dbus` |
+| Dispositivi | nessuno (BLE via D-Bus) |
+| Riavvio | always |
+
+### Variabili d'ambiente
+
+| Variabile | Default | Descrizione |
+|-----------|---------|-------------|
+| `SSH_ROOT_PASSWORD` | — | Password root SSH (obbligatoria) |
+| `BLE_ADAPTER` | `hci0` | Adattatore BLE |
+| `BLE_SCAN_SEC` | `10` | Durata scansione (secondi) |
+| `BLE_POLL_SEC` | `10` | Intervallo tra scansioni |
+| `NEXYHUB_DB_PATH` | `/mnt/shared/nexyhub.db` | Path database |
+
+## Deploy
+
+```bash
+docker build -t nexyhub-ble -f src/nexyhub-ble/Dockerfile .
+docker save -o nexyhub-ble.tar nexyhub-ble
+# carica .tar via LuCI → Container panel
+```
