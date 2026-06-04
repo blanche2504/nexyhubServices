@@ -18,11 +18,10 @@ fi
 
 build_all() {
     echo "building images..."
-    docker build -t nexyhub-hello -f Dockerfile .
-    docker build -t nexyhub-can -f Dockerfile.can .
-    docker build -t nexyhub-serial -f Dockerfile.serial .
-    docker build -t nexyhub-ble -f Dockerfile.ble .
-    docker build -t nexyhub-ipc -f Dockerfile.ipc .
+    docker build -t nexyhub-can -f src/nexyhub-can/Dockerfile .
+    docker build -t nexyhub-serial -f src/nexyhub-serial/Dockerfile .
+    docker build -t nexyhub-ble -f src/nexyhub-ble/Dockerfile .
+    docker build -t nexyhub-ipc -f src/nexyhub-aggregator/Dockerfile .
 }
 
 run_can() {
@@ -53,43 +52,6 @@ run_serial() {
         nexyhub-serial
 }
 
-run_rs485() {
-    echo "starting RS-485 monitor..."
-    docker run -d --rm \
-        --name nexyhub-rs485 \
-        --network bridge \
-        -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
-        -v "${SHARED_DIR}:/mnt/shared" \
-        -v /dev/ttyLP2:/dev/ttyLP2 \
-        -e SSH_ROOT_PASSWORD=nexyhub \
-        -e SERIAL_PORT=/dev/ttyLP2 \
-        nexyhub-serial ./.venv/bin/nexyhub-rs485
-}
-
-run_ble() {
-    echo "starting BLE scanner..."
-    docker run -d --rm \
-        --name nexyhub-ble \
-        --network bridge \
-        -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
-        -v "${SHARED_DIR}:/mnt/shared" \
-        -v /run/dbus:/run/dbus \
-        -e SSH_ROOT_PASSWORD=nexyhub \
-        nexyhub-ble
-}
-
-run_consumer() {
-    echo "starting IPC consumer..."
-    docker run -d --rm \
-        --name nexyhub-consumer \
-        --network bridge \
-        -p 8000:8000 \
-        -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
-        -v "${SHARED_DIR}:/mnt/shared" \
-        -e SSH_ROOT_PASSWORD=nexyhub \
-        nexyhub-ipc ./.venv/bin/nexyhub-consumer
-}
-
 run_simulate() {
     echo "starting elevator data simulator..."
     # create serial PTY
@@ -107,21 +69,21 @@ run_simulate() {
     kill $SOCAT_PID 2>/dev/null; true
 }
 
-run_ui() {
-    echo "starting dashboard..."
+run_consumer() {
+    echo "starting IPC aggregator (API + UI)..."
     docker run -d --rm \
-        --name nexyhub-ui \
+        --name nexyhub-consumer \
         --network bridge \
         -p 5000:5000 \
         -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
         -v "${SHARED_DIR}:/mnt/shared" \
         -e SSH_ROOT_PASSWORD=nexyhub \
-        nexyhub-ui
+        nexyhub-ipc
 }
 
 stop_all() {
     echo "stopping all containers..."
-    docker stop nexyhub-can nexyhub-serial nexyhub-rs485 nexyhub-ble nexyhub-consumer nexyhub-ui 2>/dev/null || true
+    docker stop nexyhub-can nexyhub-serial nexyhub-ble nexyhub-consumer 2>/dev/null || true
 }
 
 logs() {
@@ -132,11 +94,8 @@ case "${1:-help}" in
     build) build_all ;;
     can) run_can ;;
     serial) run_serial ;;
-    rs485) run_rs485 ;;
     ble) run_ble ;;
-    producer) run_producer ;;
     consumer) run_consumer ;;
-    ui) run_ui ;;
     simulate) run_simulate ;;
     stop) stop_all ;;
     logs) shift; logs "$@" ;;
@@ -145,13 +104,11 @@ case "${1:-help}" in
         echo ""
         echo "commands:"
         echo "  build        build all docker images"
-        echo "  can          start CAN monitor"
-        echo "  serial       start RS-232 monitor"
-        echo "  rs485        start RS-485 monitor"
-        echo "  ble          start BLE scanner"
-        echo "  consumer     start IPC consumer"
+        echo "  can          start CAN monitor (slot 1)"
+        echo "  serial       start RS-232/485 + Modbus (slot 2)"
+        echo "  ble          start BLE scanner (slot 3)"
+        echo "  consumer     start API + dashboard (slot 4, port 5000)"
         echo "  simulate     run elevator data simulator"
-        echo "  ui           start dashboard (port 5000)"
         echo "  stop         stop all containers"
         echo "  logs <name>  tail logs for a container"
         ;;
