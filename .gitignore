@@ -4,6 +4,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
 
 # Virtual environment
 .venv/
@@ -23,3 +24,4 @@ Thumbs.db
 .DS_Store
 
 reference/
+.agents/
