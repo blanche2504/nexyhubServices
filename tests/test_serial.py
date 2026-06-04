@@ -1,6 +1,4 @@
-"""
-Test serial monitor — works on any platform by mocking pyserial.
-"""
+# test serial monitor - works on any platform by mocking pyserial
 
 import os
 import sys
@@ -54,16 +52,18 @@ class MockGpioRequest:
 
 
 class TestSerialEcho(unittest.TestCase):
-    def test_echo_eseguito(self):
+    def test_echo_ack(self):
+        # serial_loop responds with ACK when it receives TEST232
         from nexyhub_serial.serial_echo import serial_loop
 
         ser = MockSerial()
         ser._buffer = [b"TEST232\n"]
         serial_loop(ser)
         self.assertGreaterEqual(len(ser._written), 1)
-        self.assertIn(b"ESEGUITO", ser._written[0])
+        self.assertIn(b"ACK", ser._written[0])
 
     def test_no_response_for_other(self):
+        # serial_loop does not respond to non-TEST commands
         from nexyhub_serial.serial_echo import serial_loop
 
         ser = MockSerial()
@@ -72,6 +72,7 @@ class TestSerialEcho(unittest.TestCase):
         self.assertEqual(len(ser._written), 0)
 
     def test_empty_line_skips(self):
+        # serial_loop skips empty lines and responds to the next valid command
         from nexyhub_serial.serial_echo import serial_loop
 
         ser = MockSerial()
@@ -80,12 +81,14 @@ class TestSerialEcho(unittest.TestCase):
         self.assertGreaterEqual(len(ser._written), 1)
 
     def test_wait_for_device_found(self):
+        # wait_for_device returns True when the device path exists
         with patch("os.path.exists", return_value=True):
             from nexyhub_serial.serial_echo import wait_for_device
             result = wait_for_device("/dev/ttyLP6", timeout=1)
             self.assertTrue(result)
 
     def test_wait_for_device_not_found(self):
+        # wait_for_device returns False when the device path never appears
         with patch("os.path.exists", return_value=False):
             from nexyhub_serial.serial_echo import wait_for_device
             import nexyhub_serial.serial_echo as mod
@@ -95,16 +98,18 @@ class TestSerialEcho(unittest.TestCase):
 
 
 class TestRS485Echo(unittest.TestCase):
-    def test_rs485_echo_eseguito(self):
+    def test_rs485_echo_ack(self):
+        # rs485_loop responds with ACK when it receives TEST485
         from nexyhub_serial.rs485_echo import rs485_loop
 
         ser = MockSerial()
         ser._buffer = [b"TEST485\n"]
         rs485_loop(ser)
         self.assertGreaterEqual(len(ser._written), 1)
-        self.assertIn(b"ESEGUITO", ser._written[0])
+        self.assertIn(b"ACK", ser._written[0])
 
     def test_rs485_no_response_for_other(self):
+        # rs485_loop does not respond to non-TEST commands
         from nexyhub_serial.rs485_echo import rs485_loop
 
         ser = MockSerial()
@@ -114,6 +119,7 @@ class TestRS485Echo(unittest.TestCase):
 
     @patch("nexyhub_serial.rs485_echo.gpiod")
     def test_rs485_de_toggled_before_write(self, mock_gpiod):
+        # rs485_loop toggles DE gpio line ACTIVE before write and INACTIVE after
         mock_gpiod.line.Value.ACTIVE = 1
         mock_gpiod.line.Value.INACTIVE = 0
         from nexyhub_serial.rs485_echo import rs485_loop
@@ -123,7 +129,7 @@ class TestRS485Echo(unittest.TestCase):
         ser._buffer = [b"TEST485\n"]
         rs485_loop(ser, gpio_req)
         self.assertGreaterEqual(len(ser._written), 1)
-        self.assertIn(b"ESEGUITO", ser._written[0])
+        self.assertIn(b"ACK", ser._written[0])
         self.assertIn((2, 1), gpio_req.calls, "DE not set to ACTIVE before write")
         self.assertIn((2, 0), gpio_req.calls, "DE not set to INACTIVE after write")
         active_idx = gpio_req.calls.index((2, 1))
@@ -133,10 +139,12 @@ class TestRS485Echo(unittest.TestCase):
 
 class TestModbusRTU(unittest.TestCase):
     def test_modbus_import(self):
+        # the pymodbus library is importable from the modbus_rtu module
         from nexyhub_serial.modbus_rtu import pymodbus
         self.assertIsNotNone(pymodbus, "pymodbus should be importable")
 
     def test_modbus_main_no_device(self):
+        # modbus_rtu.main does not crash when the serial device does not exist
         import nexyhub_serial.modbus_rtu as mod
         mod.running = False
         with patch("os.path.exists", return_value=False):

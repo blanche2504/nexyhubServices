@@ -33,7 +33,7 @@ def wait_for_interface(ifname: str, timeout: int = 120) -> bool:
     while running:
         try:
             bus = can.Bus(interface="socketcan", channel=ifname, receive_own_messages=False)
-            bus.close()
+            bus.shutdown()
             return True
         except OSError:
             elapsed = int(time.time() - start)
@@ -74,8 +74,8 @@ def can_loop(ifname: str, filters: list, bus=None) -> str:
             log("RX", f"ID=0x{msg.arbitration_id:03X} DLC={msg.dlc} DATA={text}")
 
             if "TESTCAN" in text.upper():
-                if send_message(bus, msg.arbitration_id, b"ESEGUITO"):
-                    log("TX", f"ID=0x{msg.arbitration_id:03X} DATA=ESEGUITO")
+                if send_message(bus, msg.arbitration_id, b"ACK"):
+                    log("TX", f"ID=0x{msg.arbitration_id:03X} DATA=ACK")
 
     finally:
         bus.shutdown()

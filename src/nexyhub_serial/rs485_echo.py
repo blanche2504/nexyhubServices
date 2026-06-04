@@ -78,12 +78,12 @@ def rs485_loop(ser, gpio_req=None) -> None:
             if "TEST485" in text.upper():
                 if gpio_req is not None and gpiod is not None:
                     gpio_req.set_value(GPIO_DE_LINE, gpiod.line.Value.ACTIVE)
-                ser.write(b"ESEGUITO\n")
+                ser.write(b"ACK\n")
                 ser.flush()
                 time.sleep(10 / BAUDRATE)
                 if gpio_req is not None and gpiod is not None:
                     gpio_req.set_value(GPIO_DE_LINE, gpiod.line.Value.INACTIVE)
-                log("TX", "ESEGUITO")
+                log("TX", "ACK")
         except (serial.SerialException, OSError) as e:
             log("ERROR", f"Serial error: {e}")
             break

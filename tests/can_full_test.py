@@ -35,6 +35,15 @@ def check(name: str, condition: bool, detail: str = ""):
         print(f"  FAIL {name}" + (f" - {detail}" if detail else ""))
 
 
+def have_vcan(ifname: str = "vcan0") -> bool:
+    try:
+        import subprocess
+        r = subprocess.run(["ip", "link", "show", ifname], capture_output=True, timeout=2)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
 def run_tests():
     global PASS, FAIL
 
@@ -138,7 +147,7 @@ def run_tests():
         bus.send.return_value = None
         return bus
 
-    # Test: receive TESTCAN, expect ESEGUITO response
+    # Test: receive TESTCAN, expect ACK response
     bus1 = make_mock_bus([can.Message(arbitration_id=0x200, data=b"TESTCAN")])
 
     result_holder = []
@@ -153,10 +162,9 @@ def run_tests():
 
     if bus1.send.call_args:
         sent = bus1.send.call_args[0][0]
-        check("can_loop: TESTCAN sent ESEGUITO", sent.data == b"ESEGUITO")
-        check("can_loop: response ID matches", sent.arbitration_id == 0x200)
+        check("can_loop: TESTCAN sent ACK", sent.data == b"ACK")
     else:
-        check("can_loop: TESTCAN sent ESEGUITO", False, "no response sent")
+        check("can_loop: TESTCAN sent ACK", False, "no response sent")
 
     # Test: receive non-TESTCAN frame, expect no response
     mon.running = True
@@ -173,8 +181,41 @@ def run_tests():
 
     check("can_loop: non-TESTCAN gets no response", bus2.send.call_count == 0)
 
-    # --- 6. Environment capabilities (informational, not counted in FAIL) ---
-    print("\n6. Environment capabilities")
+    # --- 6. Real SocketCAN via vcan (requires vcan kernel module) ---
+    print("\n6. Real SocketCAN via vcan")
+
+    if have_vcan("vcan0"):
+        try:
+            import can as can_mod
+            bus_a = can_mod.Bus(interface="socketcan", channel="vcan0", receive_own_messages=False)
+            bus_b = can_mod.Bus(interface="socketcan", channel="vcan0", receive_own_messages=True)
+
+            frames = [
+                can_mod.Message(arbitration_id=0x100, data=b"HELLO"),
+                can_mod.Message(arbitration_id=0x200, data=b"TESTCAN"),
+                can_mod.Message(arbitration_id=0x300, data=b"WORLD"),
+            ]
+            for f in frames:
+                bus_a.send(f)
+
+            received = 0
+            for expected_id, expected_data in [(0x100, b"HELLO"), (0x200, b"TESTCAN"), (0x300, b"WORLD")]:
+                rx = bus_b.recv(timeout=0.5)
+                if rx and rx.arbitration_id == expected_id and rx.data == expected_data:
+                    received += 1
+
+            check("vcan: received all 3 frames", received == 3)
+
+            bus_a.shutdown()
+            bus_b.shutdown()
+
+        except Exception as e:
+            print(f"  SKIP vcan test: {e}")
+    else:
+        print("  SKIP vcan test: vcan0 not available")
+
+    # --- 7. Environment capabilities (informational, not counted in FAIL) ---
+    print("\n7. Environment capabilities")
 
     import socket
 

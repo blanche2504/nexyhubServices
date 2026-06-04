@@ -61,8 +61,8 @@ def serial_loop(ser) -> None:
             log("RX", text)
 
             if "TEST232" in text.upper():
-                ser.write(b"ESEGUITO\n")
-                log("TX", "ESEGUITO")
+                ser.write(b"ACK\n")
+                log("TX", "ACK")
         except (serial.SerialException, OSError) as e:
             log("ERROR", f"Serial error: {e}")
             break
