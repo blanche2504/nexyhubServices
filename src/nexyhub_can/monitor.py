@@ -105,7 +105,7 @@ def can_loop(ifname: str, filters: list, bus=None, db=None, alarm_engine=None) -
 def main() -> None:
     cfg = load_config()
     db_path = cfg.logging_db_path
-    can_iface = cfg.can_interface or CAN_INTERFACE
+    can_iface = CAN_INTERFACE or cfg.can_interface
 
     db = None
     try:

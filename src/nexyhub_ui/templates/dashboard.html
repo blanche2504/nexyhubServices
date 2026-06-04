@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nexyhub dashboard</title>
+<script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+h1 { font-size: 1.5rem; margin-bottom: 16px; color: #38bdf8; }
+.card { background: #1e293b; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+.card h2 { font-size: 1rem; color: #94a3b8; margin-bottom: 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.stat { text-align: center; }
+.stat .value { font-size: 1.8rem; font-weight: 700; color: #38bdf8; }
+.stat .label { font-size: 0.8rem; color: #64748b; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #334155; }
+th { color: #94a3b8; font-weight: 600; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+.badge-warning { background: #f59e0b; color: #0f172a; }
+.badge-critical { background: #ef4444; color: #fff; }
+.badge-ok { background: #22c55e; color: #0f172a; }
+.plot { width: 100%; height: 300px; }
+.refresh { text-align: right; font-size: 0.8rem; color: #64748b; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<h1>nexyhub dashboard</h1>
+<div class="refresh" id="refresh-info">auto-refresh every 5s</div>
+
+<div class="grid" id="stats"></div>
+
+<div class="card">
+  <h2>readings over time</h2>
+  <div id="chart-timeseries" class="plot"></div>
+</div>
+
+<div class="card">
+  <h2>readings per source</h2>
+  <div id="chart-source" class="plot" style="height: 200px;"></div>
+</div>
+
+<div class="card">
+  <h2>latest readings</h2>
+  <div style="max-height: 300px; overflow-y: auto;">
+    <table><thead><tr><th>time</th><th>source</th><th>key</th><th>value</th><th>unit</th></tr></thead>
+    <tbody id="readings-table"></tbody></table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>active alarms</h2>
+  <div id="alarms"></div>
+</div>
+
+<script>
+const COLORS = { temperature: '#f59e0b', humidity: '#22c55e', pressure: '#38bdf8', can: '#ef4444', default: '#94a3b8' };
+
+function groupBy(arr, fn) {
+  const m = new Map();
+  arr.forEach(x => { const k = fn(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); });
+  return Object.fromEntries(m);
+}
+
+function plotTimeseries(readings) {
+  const numeric = readings.filter(r => r.value != null).reverse();
+  if (numeric.length < 2) return;
+  const byKey = groupBy(numeric, r => r.key);
+  const traces = Object.entries(byKey).map(([key, pts]) => ({
+    x: pts.map(p => new Date(p.ts * 1000)),
+    y: pts.map(p => p.value),
+    type: 'scatter', mode: 'lines+markers',
+    name: key,
+    line: { color: COLORS[key] || COLORS.default, width: 2 },
+    marker: { size: 4 },
+  }));
+  Plotly.newPlot('chart-timeseries', traces, {
+    margin: { t: 10, r: 10, b: 40, l: 50 },
+    paper_bgcolor: '#1e293b', plot_bgcolor: '#1e293b',
+    font: { color: '#94a3b8', size: 11 },
+    xaxis: { gridcolor: '#334155' },
+    yaxis: { gridcolor: '#334155' },
+    legend: { orientation: 'h', y: 1.1 },
+  }, { responsive: true, displayModeBar: false });
+}
+
+function plotSource(readings) {
+  const bySource = groupBy(readings, r => r.source);
+  const labels = Object.keys(bySource);
+  const values = labels.map(k => bySource[k].length);
+  Plotly.newPlot('chart-source', [{
+    labels, values,
+    type: 'pie',
+    marker: { colors: ['#38bdf8', '#22c55e', '#f59e0b', '#ef4444', '#a78bfa'] },
+    textinfo: 'label+value',
+    textfont: { color: '#e2e8f0', size: 12 },
+  }], {
+    margin: { t: 0, r: 0, b: 0, l: 0 },
+    paper_bgcolor: '#1e293b',
+    font: { color: '#94a3b8' },
+  }, { responsive: true, displayModeBar: false });
+}
+
+async function load() {
+  const [status, readings, alarms] = await Promise.all([
+    fetch('/api/status').then(r => r.json()),
+    fetch('/api/readings').then(r => r.json()),
+    fetch('/api/alarms').then(r => r.json()),
+  ]);
+
+  document.getElementById('stats').innerHTML = `
+    <div class="card stat"><div class="value">${status.file_count}</div><div class="label">shared files</div></div>
+    <div class="card stat"><div class="value">${status.total_readings}</div><div class="label">db readings</div></div>
+    <div class="card stat"><div class="value">${status.active_alarms}</div><div class="label">active alarms</div></div>
+    <div class="card stat"><div class="value">${status.uptime}s</div><div class="label">uptime</div></div>
+  `;
+
+  plotTimeseries(readings);
+  plotSource(readings);
+
+  const tbody = document.getElementById('readings-table');
+  tbody.innerHTML = readings.slice(0, 50).map(r => {
+    const ts = new Date(r.ts * 1000).toLocaleTimeString();
+    const val = r.value != null ? r.value : r.text_value || '';
+    return `<tr><td>${ts}</td><td>${r.source}</td><td>${r.key}</td><td>${val}</td><td>${r.unit || ''}</td></tr>`;
+  }).join('');
+
+  const alarmsDiv = document.getElementById('alarms');
+  if (alarms.active.length === 0) {
+    alarmsDiv.innerHTML = '<p style="color: #22c55e;">no active alarms</p>';
+  } else {
+    alarmsDiv.innerHTML = alarms.active.map(a =>
+      `<span class="badge badge-${a.severity}">${a.name}: ${a.message}</span>`
+    ).join(' ');
+  }
+}
+
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

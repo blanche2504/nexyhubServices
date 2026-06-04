@@ -27,9 +27,11 @@ build_all() {
 
 run_can() {
     echo "starting CAN monitor..."
+    # use --network host to access host vcan/can interfaces
+    # in production the platform handles this
     docker run -d --rm \
         --name nexyhub-can \
-        --network bridge \
+        --network host \
         -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
         -v "${SHARED_DIR}:/mnt/shared" \
         -e SSH_ROOT_PASSWORD=nexyhub \
@@ -99,6 +101,18 @@ run_consumer() {
         nexyhub-ipc ./.venv/bin/nexyhub-consumer
 }
 
+run_ui() {
+    echo "starting UI dashboard..."
+    docker run -d --rm \
+        --name nexyhub-ui \
+        --network bridge \
+        -p 5000:5000 \
+        -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
+        -v "${SHARED_DIR}:/mnt/shared" \
+        -e SSH_ROOT_PASSWORD=nexyhub \
+        nexyhub-ui
+}
+
 stop_all() {
     echo "stopping all containers..."
     docker stop nexyhub-can nexyhub-serial nexyhub-rs485 nexyhub-ble nexyhub-producer nexyhub-consumer 2>/dev/null || true
@@ -116,6 +130,7 @@ case "${1:-help}" in
     ble) run_ble ;;
     producer) run_producer ;;
     consumer) run_consumer ;;
+    ui) run_ui ;;
     stop) stop_all ;;
     logs) shift; logs "$@" ;;
     *)
@@ -128,8 +143,9 @@ case "${1:-help}" in
         echo "  rs485        start RS-485 monitor"
         echo "  ble          start BLE scanner"
         echo "  producer     start IPC producer"
-        echo "  consumer     start IPC consumer"
-        echo "  stop         stop all containers"
+    echo "  consumer     start IPC consumer"
+    echo "  ui           start UI dashboard (port 5000)"
+    echo "  stop         stop all containers"
         echo "  logs <name>  tail logs for a container"
         ;;
 esac
