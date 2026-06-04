@@ -55,10 +55,12 @@ run_can() {
 run_serial() {
     local port="${SERIAL_PORT:-/dev/ttyLP6}"
     echo "starting serial monitor on ${port}..."
+    echo "  production: use '--device' flag in LuCI (real UART)"
+    echo "  local dev:  'bash run.sh simulate' handles PTY setup"
     docker run -d --rm \
         --name nexyhub-serial \
         --network bridge \
-        --device "${port}:${port}" \
+        -v "${port}:${port}" \
         -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
         -v "${SHARED_DIR}:/mnt/shared" \
         -e SSH_ROOT_PASSWORD=nexyhub \
@@ -93,8 +95,7 @@ run_simulate() {
     echo "serial PTY at ${PTY} (peer: ${PEER})"
 
     # restart serial container with host /dev mount so it can see the host PTY
-    docker stop nexyhub-serial 2>/dev/null || true
-    docker rm nexyhub-serial 2>/dev/null || true
+    docker rm -f nexyhub-serial 2>/dev/null || true
     docker run -d --rm \
         --name nexyhub-serial \
         --network bridge \
@@ -111,9 +112,10 @@ run_simulate() {
     CAN_INTERFACE="${CAN_INTERFACE:-vcan0}" SERIAL_DEV="${PEER}" uv run python3 simulate.py
 
     echo "simulator done, cleaning up..."
-    docker stop nexyhub-serial 2>/dev/null || true
+    docker rm -f nexyhub-serial 2>/dev/null || true
     kill $SOCAT_PID 2>/dev/null || true
     rm -f /tmp/nexyhub-pty /tmp/nexyhub-pty-peer 2>/dev/null
+    echo "cleanup complete"
 }
 
 run_consumer() {
