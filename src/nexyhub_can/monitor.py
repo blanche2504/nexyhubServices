@@ -78,8 +78,12 @@ def can_loop(ifname: str, filters: list, bus=None, db=None, alarm_engine=None) -
             key = f"id=0x{msg.arbitration_id:03X}"
             log("RX", f"{key} DLC={msg.dlc} DATA={text}")
 
+            value = None
+            if msg.data:
+                value = float(msg.data[0])
+
             if db:
-                db.insert_reading("can", key, text_value=text)
+                db.insert_reading("can", key, value=value, text_value=text)
 
             if "TESTCAN" in text.upper():
                 if send_message(bus, msg.arbitration_id, b"ACK"):

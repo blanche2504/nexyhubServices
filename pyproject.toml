@@ -20,7 +20,6 @@ nexyhub-serial = "nexyhub_serial.serial_echo:main"
 nexyhub-rs485 = "nexyhub_serial.rs485_echo:main"
 nexyhub-modbus = "nexyhub_serial.modbus_rtu:main"
 nexyhub-ble = "nexyhub_ble.ble_scanner:main"
-nexyhub-producer = "nexyhub_ipc.producer:main"
 nexyhub-consumer = "nexyhub_ipc.consumer:main"
 nexyhub-ui = "nexyhub_ui.app:app.run"
 

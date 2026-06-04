@@ -78,17 +78,6 @@ run_ble() {
         nexyhub-ble
 }
 
-run_producer() {
-    echo "starting IPC producer..."
-    docker run -d --rm \
-        --name nexyhub-producer \
-        --network bridge \
-        -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
-        -v "${SHARED_DIR}:/mnt/shared" \
-        -e SSH_ROOT_PASSWORD=nexyhub \
-        nexyhub-ipc
-}
-
 run_consumer() {
     echo "starting IPC consumer..."
     docker run -d --rm \
@@ -101,8 +90,25 @@ run_consumer() {
         nexyhub-ipc ./.venv/bin/nexyhub-consumer
 }
 
+run_simulate() {
+    echo "starting elevator data simulator..."
+    # create serial PTY
+    rm -f /tmp/ttyLP6 /tmp/ttyLP6-peer 2>/dev/null
+    socat -d -d pty,link=/tmp/ttyLP6,raw,echo=0 pty,link=/tmp/ttyLP6-peer,raw,echo=0 &
+    SOCAT_PID=$!
+    sleep 1
+    echo "serial PTY at /tmp/ttyLP6 (peer: /tmp/ttyLP6-peer)"
+
+    # symlink for serial container
+    sudo ln -sf /tmp/ttyLP6 /dev/ttyLP6 2>/dev/null; true
+
+    # start simulator
+    uv run python3 simulate.py
+    kill $SOCAT_PID 2>/dev/null; true
+}
+
 run_ui() {
-    echo "starting UI dashboard..."
+    echo "starting dashboard..."
     docker run -d --rm \
         --name nexyhub-ui \
         --network bridge \
@@ -115,7 +121,7 @@ run_ui() {
 
 stop_all() {
     echo "stopping all containers..."
-    docker stop nexyhub-can nexyhub-serial nexyhub-rs485 nexyhub-ble nexyhub-producer nexyhub-consumer 2>/dev/null || true
+    docker stop nexyhub-can nexyhub-serial nexyhub-rs485 nexyhub-ble nexyhub-consumer nexyhub-ui 2>/dev/null || true
 }
 
 logs() {
@@ -131,6 +137,7 @@ case "${1:-help}" in
     producer) run_producer ;;
     consumer) run_consumer ;;
     ui) run_ui ;;
+    simulate) run_simulate ;;
     stop) stop_all ;;
     logs) shift; logs "$@" ;;
     *)
@@ -142,10 +149,10 @@ case "${1:-help}" in
         echo "  serial       start RS-232 monitor"
         echo "  rs485        start RS-485 monitor"
         echo "  ble          start BLE scanner"
-        echo "  producer     start IPC producer"
-    echo "  consumer     start IPC consumer"
-    echo "  ui           start UI dashboard (port 5000)"
-    echo "  stop         stop all containers"
+        echo "  consumer     start IPC consumer"
+        echo "  simulate     run elevator data simulator"
+        echo "  ui           start dashboard (port 5000)"
+        echo "  stop         stop all containers"
         echo "  logs <name>  tail logs for a container"
         ;;
 esac

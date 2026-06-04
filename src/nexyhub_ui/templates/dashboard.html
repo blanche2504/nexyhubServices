@@ -22,8 +22,9 @@ th { color: #94a3b8; font-weight: 600; }
 .badge-warning { background: #f59e0b; color: #0f172a; }
 .badge-critical { background: #ef4444; color: #fff; }
 .badge-ok { background: #22c55e; color: #0f172a; }
-.plot { width: 100%; height: 300px; }
+.plot { width: 100%; height: 250px; }
 .refresh { text-align: right; font-size: 0.8rem; color: #64748b; margin-bottom: 8px; }
+select { background: #334155; color: #e2e8f0; border: 1px solid #475569; border-radius: 4px; padding: 4px 8px; font-size: 0.85rem; }
 </style>
 </head>
 <body>
@@ -33,13 +34,18 @@ th { color: #94a3b8; font-weight: 600; }
 <div class="grid" id="stats"></div>
 
 <div class="card">
-  <h2>readings over time</h2>
-  <div id="chart-timeseries" class="plot"></div>
+  <h2>services</h2>
+  <table><thead><tr><th>service</th><th>status</th><th>last seen</th><th>readings</th></tr></thead>
+    <tbody id="services-table"></tbody></table>
 </div>
 
 <div class="card">
-  <h2>readings per source</h2>
-  <div id="chart-source" class="plot" style="height: 200px;"></div>
+  <h2>readings over time</h2>
+  <div style="margin-bottom: 8px;">
+    key: <select id="key-select" onchange="plotTimeseries(currentReadings)"><option value="">(all numeric)</option></select>
+  </div>
+  <div id="chart-timeseries" class="plot" style="position: relative;"></div>
+  <div id="chart-empty" style="display: none; color: #64748b; text-align: center; padding: 60px 0;">waiting for numeric data...</div>
 </div>
 
 <div class="card">
@@ -56,7 +62,8 @@ th { color: #94a3b8; font-weight: 600; }
 </div>
 
 <script>
-const COLORS = { temperature: '#f59e0b', humidity: '#22c55e', pressure: '#38bdf8', can: '#ef4444', default: '#94a3b8' };
+const COLORS = { temperature: '#f59e0b', humidity: '#22c55e', pressure: '#38bdf8', default: '#94a3b8' };
+let currentReadings = [];
 
 function groupBy(arr, fn) {
   const m = new Map();
@@ -66,17 +73,30 @@ function groupBy(arr, fn) {
 
 function plotTimeseries(readings) {
   const numeric = readings.filter(r => r.value != null).reverse();
-  if (numeric.length < 2) return;
+  const chartEl = document.getElementById('chart-timeseries');
+  const emptyEl = document.getElementById('chart-empty');
+  if (numeric.length < 2) {
+    chartEl.style.display = 'none';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  chartEl.style.display = 'block';
+  emptyEl.style.display = 'none';
   const byKey = groupBy(numeric, r => r.key);
-  const traces = Object.entries(byKey).map(([key, pts]) => ({
-    x: pts.map(p => new Date(p.ts * 1000)),
-    y: pts.map(p => p.value),
-    type: 'scatter', mode: 'lines+markers',
-    name: key,
-    line: { color: COLORS[key] || COLORS.default, width: 2 },
-    marker: { size: 4 },
-  }));
-  Plotly.newPlot('chart-timeseries', traces, {
+  const sel = document.getElementById('key-select').value;
+  const keys = sel ? [sel] : Object.keys(byKey);
+  const traces = keys.map(key => {
+    const pts = byKey[key] || [];
+    return {
+      x: pts.map(p => new Date(p.ts * 1000)),
+      y: pts.map(p => p.value),
+      type: 'scatter', mode: 'lines+markers',
+      name: key,
+      line: { color: COLORS[key] || COLORS.default, width: 2 },
+      marker: { size: 4 },
+    };
+  });
+  Plotly.react('chart-timeseries', traces, {
     margin: { t: 10, r: 10, b: 40, l: 50 },
     paper_bgcolor: '#1e293b', plot_bgcolor: '#1e293b',
     font: { color: '#94a3b8', size: 11 },
@@ -86,29 +106,15 @@ function plotTimeseries(readings) {
   }, { responsive: true, displayModeBar: false });
 }
 
-function plotSource(readings) {
-  const bySource = groupBy(readings, r => r.source);
-  const labels = Object.keys(bySource);
-  const values = labels.map(k => bySource[k].length);
-  Plotly.newPlot('chart-source', [{
-    labels, values,
-    type: 'pie',
-    marker: { colors: ['#38bdf8', '#22c55e', '#f59e0b', '#ef4444', '#a78bfa'] },
-    textinfo: 'label+value',
-    textfont: { color: '#e2e8f0', size: 12 },
-  }], {
-    margin: { t: 0, r: 0, b: 0, l: 0 },
-    paper_bgcolor: '#1e293b',
-    font: { color: '#94a3b8' },
-  }, { responsive: true, displayModeBar: false });
-}
-
 async function load() {
-  const [status, readings, alarms] = await Promise.all([
+  const [status, readings, alarms, services] = await Promise.all([
     fetch('/api/status').then(r => r.json()),
     fetch('/api/readings').then(r => r.json()),
     fetch('/api/alarms').then(r => r.json()),
+    fetch('/api/services').then(r => r.json()),
   ]);
+
+  currentReadings = readings;
 
   document.getElementById('stats').innerHTML = `
     <div class="card stat"><div class="value">${status.file_count}</div><div class="label">shared files</div></div>
@@ -117,8 +123,27 @@ async function load() {
     <div class="card stat"><div class="value">${status.uptime}s</div><div class="label">uptime</div></div>
   `;
 
+  const stbody = document.getElementById('services-table');
+  stbody.innerHTML = Object.entries(services).map(([id, s]) => {
+    const badge = s.alive ? 'badge-ok' : 'badge-critical';
+    const label = s.alive ? 'alive' : 'dead';
+    const last = s.last_seen != null ? s.last_seen + 's' : (s.uptime != null ? s.uptime + 's' : (s.file_age != null ? s.file_age + 's' : '-'));
+    const reads = s.readings != null ? s.readings : '-';
+    return `<tr><td>${s.label}</td><td><span class="badge ${badge}">${label}</span></td><td>${last}</td><td>${reads}</td></tr>`;
+  }).join('');
+
+  const sel = document.getElementById('key-select');
+  const numeric = readings.filter(r => r.value != null);
+  const allKeys = [...new Set(readings.map(r => r.key))].sort();
+  const current = sel.value;
+  const opts = ['<option value="">(all numeric)</option>'];
+  allKeys.forEach(k => {
+    opts.push(`<option value="${k}" ${k === current ? 'selected' : ''}>${k}${numeric.some(r => r.key === k) ? '' : ' (text)'}</option>`);
+  });
+  if (allKeys.length === 0) opts.push('<option disabled>— no keys yet —</option>');
+  sel.innerHTML = opts.join('');
+
   plotTimeseries(readings);
-  plotSource(readings);
 
   const tbody = document.getElementById('readings-table');
   tbody.innerHTML = readings.slice(0, 50).map(r => {

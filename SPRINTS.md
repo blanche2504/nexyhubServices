@@ -134,10 +134,3 @@ acceptance criteria:
 
 status: IN PROGRESS
 
----
-
-## 6 ui and github pipeline
-
-- ui dashboard with flask + plotly
-- ci/cd pipeline with github actions
-- final presentation

@@ -21,8 +21,6 @@ ENV SSH_ENABLED=true
 ENV SSH_PORT=22
 
 ENV IPC_SHARED_DIR=/mnt/shared
-ENV IPC_PRODUCER_KEY=producer/data.json
-ENV IPC_INTERVAL_SEC=5
 ENV IPC_CONSUMER_PORT=8000
 
 COPY config.yaml /etc/nexyhub/config.yaml
@@ -43,4 +41,4 @@ ENV PYTHONUNBUFFERED=1
 ENV SSH_ROOT_PASSWORD=""
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["./.venv/bin/nexyhub-producer"]
+CMD ["./.venv/bin/nexyhub-consumer"]

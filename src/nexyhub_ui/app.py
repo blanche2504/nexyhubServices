@@ -40,7 +40,7 @@ def api_services():
     services = {}
 
     # check each source by last db timestamp
-    sources = {"can": "CAN bus", "serial": "serial port", "ble": "BLE scanner", "producer": "data producer"}
+    sources = {"can": "CAN bus", "serial": "serial port", "ble": "BLE scanner"}
     for src, label in sources.items():
         if db:
             rows = db.get_readings(source=src, limit=1)
@@ -56,8 +56,7 @@ def api_services():
         }
 
     # check shared memory files
-    for key, label in [("producer/data.json", "data producer"),
-                       ("ble_devices.json", "BLE scanner")]:
+    for key, label in [("ble_devices.json", "BLE scanner")]:
         age = file_age(str(SHARED_DIR / key))
         if age is not None:
             srv = key.split("/")[0]
@@ -81,7 +80,7 @@ def api_services():
     }
 
     services["ui"] = {
-        "label": "UI dashboard",
+        "label": "dashboard",
         "alive": True,
         "uptime": round(time.time() - start_time, 1),
     }
