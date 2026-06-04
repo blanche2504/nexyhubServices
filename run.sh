@@ -58,9 +58,9 @@ run_serial() {
     docker run -d --rm \
         --name nexyhub-serial \
         --network bridge \
+        --device "${port}:${port}" \
         -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
         -v "${SHARED_DIR}:/mnt/shared" \
-        -v "${port}:${port}" \
         -e SSH_ROOT_PASSWORD=nexyhub \
         -e SERIAL_PORT="${port}" \
         nexyhub-serial
@@ -80,19 +80,40 @@ run_ble() {
 
 run_simulate() {
     echo "starting elevator data simulator..."
-    # create serial PTY
-    rm -f /tmp/ttyLP6 /tmp/ttyLP6-peer 2>/dev/null
-    socat -d -d pty,link=/tmp/ttyLP6,raw,echo=0 pty,link=/tmp/ttyLP6-peer,raw,echo=0 &
+    # create serial PTY pair (nohup to survive shell timeout)
+    rm -f /tmp/nexyhub-pty /tmp/nexyhub-pty-peer 2>/dev/null
+    nohup socat -d -d pty,link=/tmp/nexyhub-pty,raw,echo=0 \
+                   pty,link=/tmp/nexyhub-pty-peer,raw,echo=0 \
+      > /tmp/nexyhub-socat.log 2>&1 &
     SOCAT_PID=$!
-    sleep 1
-    echo "serial PTY at /tmp/ttyLP6 (peer: /tmp/ttyLP6-peer)"
+    sleep 2
 
-    # symlink for serial container
-    sudo ln -sf /tmp/ttyLP6 /dev/ttyLP6 2>/dev/null; true
+    PTY=$(readlink -f /tmp/nexyhub-pty)
+    PEER=$(readlink -f /tmp/nexyhub-pty-peer)
+    echo "serial PTY at ${PTY} (peer: ${PEER})"
 
-    # start simulator
-    uv run python3 simulate.py
-    kill $SOCAT_PID 2>/dev/null; true
+    # restart serial container with host /dev mount so it can see the host PTY
+    docker stop nexyhub-serial 2>/dev/null || true
+    docker rm nexyhub-serial 2>/dev/null || true
+    docker run -d --rm \
+        --name nexyhub-serial \
+        --network bridge \
+        -v /dev:/dev \
+        -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
+        -v "${SHARED_DIR}:/mnt/shared" \
+        -e SSH_ROOT_PASSWORD=nexyhub \
+        -e SERIAL_PORT="${PTY}" \
+        nexyhub-serial
+    echo "serial container restarted on ${PTY}"
+    sleep 2
+
+    # run the elevator simulator
+    CAN_INTERFACE="${CAN_INTERFACE:-vcan0}" SERIAL_DEV="${PEER}" uv run python3 simulate.py
+
+    echo "simulator done, cleaning up..."
+    docker stop nexyhub-serial 2>/dev/null || true
+    kill $SOCAT_PID 2>/dev/null || true
+    rm -f /tmp/nexyhub-pty /tmp/nexyhub-pty-peer 2>/dev/null
 }
 
 run_consumer() {
