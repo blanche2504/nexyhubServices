@@ -128,6 +128,16 @@ run_consumer() {
         nexyhub-ipc
 }
 
+run_up() {
+    run_can
+    run_serial
+    run_ble
+    run_consumer
+    echo ""
+    echo "all services started. dashboard at http://localhost:5000"
+    echo "run 'CAN_INTERFACE=vcan0 bash run.sh simulate' to generate test data"
+}
+
 stop_all() {
     echo "stopping all containers..."
     docker stop nexyhub-can nexyhub-serial nexyhub-ble nexyhub-consumer 2>/dev/null || true
@@ -140,6 +150,7 @@ logs() {
 case "${1:-help}" in
     build) build_all ;;
     export) export_all ;;
+    up) run_up ;;
     can) run_can ;;
     serial) run_serial ;;
     ble) run_ble ;;
@@ -153,6 +164,7 @@ case "${1:-help}" in
         echo "commands:"
         echo "  build        build all docker images"
         echo "  export       export images to .tar for LuCI upload"
+        echo "  up           start all services (slots 1-4)"
         echo "  can          start CAN monitor (slot 1)"
         echo "  serial       start RS-232/485 + Modbus (slot 2)"
         echo "  ble          start BLE scanner (slot 3)"
@@ -165,5 +177,6 @@ case "${1:-help}" in
         echo "  CAN_NETWORK=host    (default: bridge, use host for local vcan)"
         echo "  CAN_INTERFACE=vcan0 (default: can0)"
         echo "  SERIAL_PORT=...     (default: /dev/ttyLP6)"
+        echo "  SERIAL_DEV=...      (simulate serial device, default: auto PTY peer)"
         ;;
 esac
