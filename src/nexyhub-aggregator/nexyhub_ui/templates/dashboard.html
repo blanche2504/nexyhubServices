@@ -61,6 +61,15 @@ select { background: #334155; color: #e2e8f0; border: 1px solid #475569; border-
   <div id="alarms"></div>
 </div>
 
+<div class="card">
+  <h2>logs</h2>
+  <div style="margin-bottom: 8px;">
+    service: <select id="log-service" onchange="loadLogs()"><option value="">(select)</option></select>
+    <span id="log-count" style="color: #64748b; font-size: 0.8rem; margin-left: 8px;"></span>
+  </div>
+  <pre id="log-output" style="background: #0f172a; color: #94a3b8; font-size: 0.75rem; padding: 8px; border-radius: 4px; max-height: 300px; overflow-y: auto; margin: 0;"></pre>
+</div>
+
 <script>
 const COLORS = { temperature: '#f59e0b', humidity: '#22c55e', pressure: '#38bdf8', default: '#94a3b8' };
 let currentReadings = [];
@@ -160,10 +169,30 @@ async function load() {
       `<span class="badge badge-${a.severity}">${a.name}: ${a.message}</span>`
     ).join(' ');
   }
+
+  const logSel = document.getElementById('log-service');
+  const prev = logSel.value;
+  const svcs = await fetch('/api/logs').then(r => r.json()).catch(() => ({services: []}));
+  logSel.innerHTML = '<option value="">(select)</option>' + svcs.services.map(s =>
+    `<option value="${s}" ${s === prev ? 'selected' : ''}>${s}</option>`
+  ).join('');
+  if (prev && svcs.services.includes(prev)) loadLogs();
+}
+
+async function loadLogs() {
+  const sel = document.getElementById('log-service');
+  const svc = sel.value;
+  const pre = document.getElementById('log-output');
+  const count = document.getElementById('log-count');
+  if (!svc) { pre.textContent = ''; count.textContent = ''; return; }
+  const data = await fetch(`/api/logs/${svc}`).then(r => r.json()).catch(() => ({lines: []}));
+  pre.textContent = data.lines.join('\n');
+  count.textContent = `${data.lines.length} lines`;
 }
 
 load();
 setInterval(load, 5000);
+setInterval(() => { if (document.getElementById('log-service').value) loadLogs(); }, 3000);
 </script>
 </body>
 </html>

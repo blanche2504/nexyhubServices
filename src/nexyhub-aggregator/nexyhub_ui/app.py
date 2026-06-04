@@ -6,6 +6,7 @@ from flask import Flask, render_template, jsonify
 
 from nexyhub_db.database import Database
 from nexyhub_ipc.shared_mem import list_keys, atomic_read, SHARED_DIR
+from nexyhub_logs import log as file_log
 
 app = Flask(__name__)
 
@@ -141,7 +142,26 @@ def api_data(key):
     return jsonify({"error": "not found"}), 404
 
 
+LOG_DIR = Path(os.environ.get("NEXYHUB_SHARED_DIR", "/mnt/shared")) / "logs"
+
+
+@app.route("/api/logs")
+@app.route("/api/logs/<service>")
+def api_logs(service=None):
+    files = sorted(LOG_DIR.glob("*.log")) if LOG_DIR.exists() else []
+    if service:
+        path = LOG_DIR / f"{service}.log"
+        if not path.exists():
+            return jsonify({"lines": [], "error": "no logs for this service"})
+        lines = path.read_text().splitlines()
+        return jsonify({"service": service, "lines": lines[-200:]})
+    services = sorted(f.stem for f in files)
+    return jsonify({"services": services})
+
+
 start_time = time.time()
+file_log("dashboard", "INFO", f"dashboard started on port {FLASK_PORT}")
+file_log("dashboard", "INFO", f"DB path: {DB_PATH}")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=FLASK_PORT, debug=False)

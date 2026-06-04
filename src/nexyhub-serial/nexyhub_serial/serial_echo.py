@@ -7,6 +7,7 @@ from nexyhub_config.loader import load_config
 from nexyhub_db.database import Database
 from nexyhub_alarms.engine import AlarmEngine
 from nexyhub_alarms.rules import AlarmRule
+from nexyhub_logs import log as file_log
 
 SERIAL_PORT = os.environ.get("SERIAL_PORT", "/dev/ttyLP6")
 BAUDRATE = int(os.environ.get("BAUDRATE", "9600"))
@@ -20,6 +21,7 @@ running = True
 def log(level: str, msg: str) -> None:
     ts = time.strftime("%H:%M:%S")
     print(f"[{ts}] [{level}] {msg}", flush=True)
+    file_log("serial", level, msg)
 
 
 def signal_handler(sig, frame) -> None:

@@ -25,6 +25,7 @@ COPY src/nexyhub-serial/nexyhub_serial/ /app/nexyhub_serial/
 COPY src/shared/nexyhub_config/ /app/nexyhub_config/
 COPY src/shared/nexyhub_db/ /app/nexyhub_db/
 COPY src/shared/nexyhub_alarms/ /app/nexyhub_alarms/
+COPY src/shared/nexyhub_logs/ /app/nexyhub_logs/
 
 ENV SSH_ROOT_PASSWORD=
 ENV SERIAL_PORT=/dev/ttyLP6

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from nexyhub_config.loader import load_config
 from nexyhub_db.database import Database
+from nexyhub_logs import log as file_log
 
 BLE_ADAPTER = os.environ.get("BLE_ADAPTER", "hci0")
 SCAN_SEC = int(os.environ.get("BLE_SCAN_SEC", "10"))
@@ -27,6 +28,7 @@ except ImportError:
 def log(level: str, msg: str) -> None:
     ts = time.strftime("%H:%M:%S")
     print(f"[{ts}] [{level}] {msg}", flush=True)
+    file_log("ble", level, msg)
 
 
 def signal_handler(sig, frame) -> None:

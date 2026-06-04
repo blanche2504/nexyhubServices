@@ -19,9 +19,13 @@ except ImportError:
     pymodbus = None
 
 
+from nexyhub_logs import log as file_log
+
+
 def log(level: str, msg: str) -> None:
     ts = time.strftime("%H:%M:%S")
     print(f"[{ts}] [{level}] {msg}", flush=True)
+    file_log("modbus", level, msg)
 
 
 def signal_handler(sig, frame) -> None:

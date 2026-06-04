@@ -26,6 +26,7 @@ COPY src/nexyhub-aggregator/nexyhub_ui/ /app/nexyhub_ui/
 COPY src/shared/nexyhub_config/ /app/nexyhub_config/
 COPY src/shared/nexyhub_db/ /app/nexyhub_db/
 COPY src/shared/nexyhub_alarms/ /app/nexyhub_alarms/
+COPY src/shared/nexyhub_logs/ /app/nexyhub_logs/
 
 ENV FLASK_PORT=5000
 ENV SSH_ROOT_PASSWORD=
