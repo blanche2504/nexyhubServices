@@ -1,59 +1,68 @@
-# nexyhub-aggregator v1.0 — dashboard + API (slot 4)
+# nexyhub-aggregator v1.0 - dashboard + API (slot 4)
 
-Container aggregatore per NexyHub Air. Unisce la dashboard Flask (porta 5000) e le API REST.
-Nessuna periferica richiesta — solo volume condiviso per leggere DB e shared memory.
+Runs a Flask dashboard on port 5000 and REST API. No peripherals required — only needs the shared volume to read the SQLite database and shared memory files written by the other services.
 
 ## Build
 
 ```bash
 # from repo root
-docker build -t nexyhub-ipc -f src/nexyhub-aggregator/Dockerfile .
+bash run.sh build
 
-# cross-compile per ARM64
+# cross-compile for ARM64
 PLATFORM=linux/arm64 sh src/nexyhub-aggregator/build.sh
 ```
 
-## Run (locale)
+## Run (local)
 
 ```bash
 bash run.sh consumer
-# dashboard su http://localhost:5000
+# dashboard at http://localhost:5000
+
+# standalone
+uv run nexyhub-consumer
+uv run nexyhub-ui
 ```
 
-## LuCI — configurazione slot
+## LuCI slot configuration
 
-| parametro | valore |
-|-----------|--------|
-| Immagine | `nexyhub-ipc.tar` |
-| Rete | bridge |
-| Porte | `225:22` (SSH), `5000:5000` (dashboard) |
-| Volumi | volume condiviso → `/mnt/shared`, config → `/etc/nexyhub/config.yaml:ro` |
-| Dispositivi | nessuno |
-| Riavvio | always |
+| parameter | value                                                                 |
+| --------- | --------------------------------------------------------------------- |
+| Image     | `nexyhub-ipc.tar`                                                     |
+| Network   | bridge                                                                |
+| Ports     | `225:22` (SSH), `5000:5000` (dashboard)                               |
+| Volumes   | shared volume → `/mnt/shared`, config → `/etc/nexyhub/config.yaml:ro` |
+| Devices   | none                                                                  |
+| Restart   | always                                                                |
 
-### Variabili d'ambiente
+### Env vars
 
-| Variabile | Default | Descrizione |
-|-----------|---------|-------------|
-| `SSH_ROOT_PASSWORD` | — | Password root SSH (obbligatoria) |
-| `FLASK_PORT` | `5000` | Porta dashboard |
-| `NEXYHUB_DB_PATH` | `/mnt/shared/nexyhub.db` | Path database |
+| Variable            | Default                  | Description                  |
+| ------------------- | ------------------------ | ---------------------------- |
+| `SSH_ROOT_PASSWORD` | —                        | Root SSH password (required) |
+| `FLASK_PORT`        | `5000`                   | Dashboard port               |
+| `NEXYHUB_DB_PATH`   | `/mnt/shared/nexyhub.db` | Database path                |
 
-### Endpoint
+### API endpoints
 
-| Percorso | Descrizione |
-|----------|-------------|
-| `GET /` | Dashboard HTML (Plotly) |
-| `GET /api/services` | Stato servizi (alive/dead) |
-| `GET /api/readings` | Ultime 100 letture |
-| `GET /api/readings/<source>` | Letture per sorgente |
-| `GET /api/alarms` | Allarmi attivi + storico |
-| `GET /api/status` | Uptime, conteggi |
+| Path                         | Description                                          |
+| ---------------------------- | ---------------------------------------------------- |
+| `GET /`                      | Dashboard HTML (Plotly charts)                       |
+| `GET /api/services`          | Service status (alive/dead per slot)                 |
+| `GET /api/readings`          | Last 100 readings                                    |
+| `GET /api/readings/<source>` | Readings filtered by source (`can`, `serial`, `ble`) |
+| `GET /api/alarms`            | Active alarms + history                              |
+| `GET /api/status`            | Uptime, file count, alarm count                      |
+| `GET /api/data/<key>`        | Shared memory data by key                            |
+| `GET /api/logs`              | List available log services                          |
+| `GET /api/logs/<service>`    | Last 200 log lines for a service                     |
 
 ## Deploy
 
 ```bash
-docker build -t nexyhub-ipc -f src/nexyhub-aggregator/Dockerfile .
-docker save -o nexyhub-ipc.tar nexyhub-ipc
-# carica .tar via LuCI → Container panel
+bash run.sh build
+bash run.sh export
+# produces nexyhub-ipc.tar — upload via LuCI → Container panel
 ```
+
+Alive/dead detection works by timestamp age: each service writes readings to the shared SQLite database. If no new reading arrives within 120 seconds (`SERVICE_TIMEOUT`), the dashboard marks the service as dead. This means a service with no traffic (e.g., CAN bus with no frames) will show as dead even if the container is still running.
+This is bad, but i'm sure i can fix it another time.

@@ -1,58 +1,62 @@
-# nexyhub-can v1.0 — CAN bus monitor (slot 1)
+# nexyhub-can CAN bus monitor (slot 1)
 
-Container Docker per monitoraggio CAN bus su NexyHub Air, basato su python-can con socketcan.
-Risponde con ACK a frame contenenti `TESTCAN`. Registra letture su DB SQLite condiviso.
+Uses `python-can` with `socketcan` (linux native CAN interface) to monitor CAN frames. Responds with ACK to frames containing `TESTCAN`. Writes readings to the shared SQLite database.
 
 ## Build
 
 ```bash
 # from repo root
-docker build -t nexyhub-can -f src/nexyhub-can/Dockerfile .
+bash run.sh build
 
 # cross-compile for ARM64
 PLATFORM=linux/arm64 sh src/nexyhub-can/build.sh
 ```
 
-## Run (locale)
+## Run (local)
 
 ```bash
-# con vcan (sviluppo locale)
+# only for dev - host network to reach vcan0
 CAN_NETWORK=host CAN_INTERFACE=vcan0 bash run.sh can
 
-# produzione (bridge, piattaforma mappa can0)
+# production — bridge (platform maps physical can0)
 bash run.sh can
+
+# all services + elevator simulator (auto-configures CAN for local dev)
+CAN_INTERFACE=vcan0 bash run.sh simulate
 ```
 
-## LuCI — configurazione slot
+## LuCI slot configuration
 
-| parametro | valore |
-|-----------|--------|
-| Immagine | `nexyhub-can.tar` |
-| Rete | bridge |
-| Porte | `222:22` (SSH) |
-| Volumi | volume condiviso → `/mnt/shared`, config → `/etc/nexyhub/config.yaml:ro` |
-| Dispositivi | can0 (mappato dalla piattaforma) |
-| Riavvio | always |
+| parameter | value                                                                 |
+| --------- | --------------------------------------------------------------------- |
+| Image     | `nexyhub-can.tar`                                                     |
+| Network   | bridge                                                                |
+| Ports     | `222:22` (SSH)                                                        |
+| Volumes   | shared volume → `/mnt/shared`, config → `/etc/nexyhub/config.yaml:ro` |
+| Devices   | can0 (mapped by the platform)                                         |
+| Restart   | always                                                                |
 
-### Variabili d'ambiente
+### Env vars
 
-| Variabile | Default | Descrizione |
-|-----------|---------|-------------|
-| `SSH_ROOT_PASSWORD` | — | Password root SSH (obbligatoria) |
-| `CAN_INTERFACE` | `can0` | Interfaccia CAN |
-| `CAN_RETRY_SEC` | `3` | Secondi tra tentativi |
-| `CAN_FILTER_IDS` | — | Filtri ID (es. `0x001,0x100-0x1FF`) |
-| `NEXYHUB_DB_PATH` | `/mnt/shared/nexyhub.db` | Path database |
+| Variable            | Default                  | Description                           |
+| ------------------- | ------------------------ | ------------------------------------- |
+| `SSH_ROOT_PASSWORD` | —                        | Root SSH password (required)          |
+| `CAN_INTERFACE`     | `can0`                   | CAN interface name                    |
+| `CAN_RETRY_SEC`     | `3`                      | Seconds between connection retries    |
+| `CAN_FILTER_IDS`    | —                        | ID filters (e.g. `0x001,0x100-0x1FF`) |
+| `NEXYHUB_DB_PATH`   | `/mnt/shared/nexyhub.db` | SQLite database path                  |
 
 ## Deploy
 
 ```bash
 # 1. build
-docker build -t nexyhub-can -f src/nexyhub-can/Dockerfile .
+bash run.sh build
 
-# 2. esporta .tar
-docker save -o nexyhub-can.tar nexyhub-can
+# 2. export to .tar
+bash run.sh export
 
-# 3. carica via LuCI → Container panel
-# 4. configura env/volumi/porte come da tabella sopra
+# 3. upload .tar via LuCI → Container panel
+# 4. configure env/volumes/ports per table above
 ```
+
+socketcan is the Linux kernel's native CAN subsystem — it exposes CAN interfaces as network devices (like `can0`, `vcan0`). `vcan0` is a virtual CAN interface for local testing without hardware.

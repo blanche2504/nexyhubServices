@@ -94,6 +94,18 @@ run_simulate() {
     PEER=$(readlink -f /tmp/nexyhub-pty-peer)
     echo "serial PTY at ${PTY} (peer: ${PEER})"
 
+    # restart CAN container with host network + vcan0 for local testing
+    docker rm -f nexyhub-can 2>/dev/null || true
+    docker run -d --rm \
+        --name nexyhub-can \
+        --network host \
+        -v "${CONFIG_DIR}/config.yaml:/etc/nexyhub/config.yaml:ro" \
+        -v "${SHARED_DIR}:/mnt/shared" \
+        -e SSH_ROOT_PASSWORD=nexyhub \
+        -e CAN_INTERFACE="${CAN_INTERFACE:-vcan0}" \
+        nexyhub-can
+    echo "CAN container restarted on ${CAN_INTERFACE:-vcan0}"
+
     # restart serial container with host /dev mount so it can see the host PTY
     docker rm -f nexyhub-serial 2>/dev/null || true
     docker run -d --rm \
@@ -112,6 +124,7 @@ run_simulate() {
     CAN_INTERFACE="${CAN_INTERFACE:-vcan0}" SERIAL_DEV="${PEER}" uv run python3 simulate.py
 
     echo "simulator done, cleaning up..."
+    docker rm -f nexyhub-can 2>/dev/null || true
     docker rm -f nexyhub-serial 2>/dev/null || true
     kill $SOCAT_PID 2>/dev/null || true
     rm -f /tmp/nexyhub-pty /tmp/nexyhub-pty-peer 2>/dev/null

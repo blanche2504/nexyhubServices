@@ -1,58 +1,73 @@
-# nexyhub-serial v1.0 — RS-232 + RS-485 + Modbus (slot 2)
+# nexyhub-serial RS-232 + RS-485 + Modbus (slot 2)
 
-Container Docker per comunicazione seriale su NexyHub Air:
-
-- **RS-232** su `/dev/ttyLP6` — echo `TEST232` con risposta `ACK`
-- **RS-485** su `/dev/ttyLP2` — echo `TEST485` con ACK e controllo GPIO DE
-- **Modbus RTU** su `/dev/ttyLP2` — polling registri holding
+- **RS-232** on `/dev/ttyLP6` — echo protocol: expects `TEST232`, replies `ACK`
+- **RS-485** on `/dev/ttyLP2` — echo protocol: expects `TEST485`, replies `ACK` with GPIO DE (Driver Enable) line toggling
+- **Modbus RTU** on `/dev/ttyLP2` — polls holding registers from a Modbus slave
 
 ## Build
 
 ```bash
 # from repo root
-docker build -t nexyhub-serial -f src/nexyhub-serial/Dockerfile .
+bash run.sh build
 
-# cross-compile per ARM64
+# cross-compile for ARM64
 PLATFORM=linux/arm64 sh src/nexyhub-serial/build.sh
 ```
 
-## Run (locale)
+## Run locally
 
 ```bash
+# production — needs real UART
 bash run.sh serial
+
+# dev with virtual serial PTY (auto-configures serial container)
+CAN_INTERFACE=vcan0 bash run.sh simulate
+
+# standalone local run (no Docker)
+uv run nexyhub-serial
+uv run nexyhub-rs485
+uv run nexyhub-modbus
 ```
 
-## LuCI — configurazione slot
+## LuCI slot configuration
 
-| parametro | valore |
-|-----------|--------|
-| Immagine | `nexyhub-serial.tar` |
-| Rete | bridge |
-| Porte | `223:22` (SSH) |
-| Volumi | volume condiviso → `/mnt/shared`, config → `/etc/nexyhub/config.yaml:ro` |
-| Dispositivi | `/dev/ttyLP6`, `/dev/ttyLP2` |
-| Riavvio | always |
+| parameter | value |
+|-----------|-------|
+| Image | `nexyhub-serial.tar` |
+| Network | bridge |
+| Ports | `223:22` (SSH) |
+| Volumes | shared volume → `/mnt/shared`, config → `/etc/nexyhub/config.yaml:ro` |
+| Devices | `/dev/ttyLP6`, `/dev/ttyLP2` |
+| Restart | always |
 
-### Variabili d'ambiente
+### Env vars
 
-| Variabile | Default | Descrizione |
-|-----------|---------|-------------|
-| `SSH_ROOT_PASSWORD` | — | Password root SSH (obbligatoria) |
-| `SERIAL_PORT` | `/dev/ttyLP6` | Porta seriale primaria |
-| `NEXYHUB_DB_PATH` | `/mnt/shared/nexyhub.db` | Path database |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SSH_ROOT_PASSWORD` | — | Root SSH password (required) |
+| `SERIAL_PORT` | `/dev/ttyLP6` | RS-232 port |
+| `BAUDRATE` | `9600` | RS-232 baud rate |
+| `PARITY` | `N` | RS-232 parity (`N`, `E`, `O`) |
+| `STOPBITS` | `1` | RS-232 stop bits (`1`, `2`) |
+| `SERIAL_TIMEOUT` | `1.0` | RS-232 read timeout (seconds) |
+| `NEXYHUB_DB_PATH` | `/mnt/shared/nexyhub.db` | Database path |
 
-### Sottocomandi (override CMD)
+Modbus uses separate env vars: `MODBUS_PORT`, `MODBUS_BAUDRATE`, `MODBUS_TIMEOUT` (defaults match RS-485 on `/dev/ttyLP2`, 9600, 1.0s).
 
-| Comando | Descrizione |
+### Subcommands
+
+| Command | Description |
 |---------|-------------|
-| `python3 -m nexyhub_serial.serial_echo` | RS-232 echo (default) |
+| `python3 -m nexyhub_serial.serial_echo` | RS-232 echo (container default) |
 | `python3 -m nexyhub_serial.rs485_echo` | RS-485 echo |
 | `python3 -m nexyhub_serial.modbus_rtu` | Modbus RTU |
+
+RS-485 uses a GPIO line for Driver Enable (DE) control — the container asserts DE before transmitting and releases it after the last stop bit. This is required by RS-485 half-duplex hardware.
 
 ## Deploy
 
 ```bash
-docker build -t nexyhub-serial -f src/nexyhub-serial/Dockerfile .
-docker save -o nexyhub-serial.tar nexyhub-serial
-# carica .tar via LuCI → Container panel
+bash run.sh build
+bash run.sh export
+# produces nexyhub-serial.tar — upload via LuCI → Container panel
 ```
