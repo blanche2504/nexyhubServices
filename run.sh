@@ -80,8 +80,23 @@ run_ble() {
         nexyhub-ble
 }
 
+setup_vcan() {
+    if ip link show vcan0 2>/dev/null >/dev/null; then
+        return 0
+    fi
+    echo "vcan0 not found — creating it (sudo required)..."
+    if ! sudo -n true 2>/dev/null; then
+        echo "NOTE: you may be prompted for sudo password to create vcan0"
+    fi
+    sudo modprobe vcan 2>/dev/null || true
+    sudo ip link add vcan0 type vcan 2>/dev/null || true
+    sudo ip link set vcan0 up
+    echo "vcan0 created"
+}
+
 run_simulate() {
     echo "starting elevator data simulator..."
+    setup_vcan
     # create serial PTY pair (nohup to survive shell timeout)
     rm -f /tmp/nexyhub-pty /tmp/nexyhub-pty-peer 2>/dev/null
     nohup socat -d -d pty,link=/tmp/nexyhub-pty,raw,echo=0 \

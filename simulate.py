@@ -66,12 +66,6 @@ def simulate_can():
                 elif floor <= 1:
                     dir_mult = 1
 
-                # random fault
-                if random.random() < 0.05:
-                    fault = random.choice([0x01, 0x02, 0x04, 0x08])
-                    bus.send(can.Message(arbitration_id=0x300, data=struct.pack("B", fault)))
-                    log(f"0x300 fault=0x{fault:02x}")
-
             except Exception as e:
                 log(f"CAN send error: {e}")
 
