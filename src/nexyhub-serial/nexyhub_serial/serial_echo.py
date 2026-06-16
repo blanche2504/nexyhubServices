@@ -90,7 +90,7 @@ def serial_loop(ser, db=None, alarm_engine=None) -> None:
 
 def main():
     cfg = load_config()
-    db_path = cfg.logging_db_path
+    db_path = os.environ.get("NEXYHUB_DB_PATH") or cfg.logging_db_path
 
     db = None
     try:

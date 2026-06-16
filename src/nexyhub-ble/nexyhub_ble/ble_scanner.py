@@ -140,8 +140,9 @@ def main():
     cfg = load_config()
     db = None
     try:
-        db = Database(cfg.logging_db_path)
-        log("INFO", f"DB logging to {cfg.logging_db_path}")
+        db_path = os.environ.get("NEXYHUB_DB_PATH") or cfg.logging_db_path
+        db = Database(db_path)
+        log("INFO", f"DB logging to {db_path}")
     except Exception as e:
         log("WARN", f"DB init failed: {e}")
 
