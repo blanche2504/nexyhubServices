@@ -12,6 +12,7 @@ from nexyhub_alarms.rules import AlarmRule
 from nexyhub_logs import log as file_log
 
 CAN_INTERFACE = os.environ.get("CAN_INTERFACE", "can0")
+CAN_BITRATE = os.environ.get("CAN_BITRATE", "")
 RETRY_SEC = int(os.environ.get("CAN_RETRY_SEC", "3"))
 FILTER_IDS_STR = os.environ.get("CAN_FILTER_IDS", "")
 
@@ -134,6 +135,7 @@ def main() -> None:
 
     log("INFO", "=== nexyhub-can monitor started ===")
     log("INFO", f"Interface: {can_iface}")
+    log("INFO", f"Bitrate: {CAN_BITRATE or '(from config)'}")
     log("INFO", f"Retry: {RETRY_SEC}s")
     log("INFO", f"PID: {os.getpid()}")
 

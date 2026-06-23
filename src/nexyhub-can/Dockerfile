@@ -6,6 +6,7 @@ LABEL version="1.0"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-server \
+    iproute2 \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /var/run/sshd /docker-entrypoint.d
 

@@ -36,6 +36,8 @@ CAN_INTERFACE=vcan0 bash run.sh simulate
 | Devices   | can0 (mapped by the platform)                                         |
 | Restart   | always                                                                |
 
+IMPORTANT: BITRATE MUST BE 125kbps
+
 ### Env vars
 
 | Variable            | Default                  | Description                           |
@@ -58,5 +60,3 @@ bash run.sh export
 # 3. upload .tar via LuCI → Container panel
 # 4. configure env/volumes/ports per table above
 ```
-
-socketcan is the Linux kernel's native CAN subsystem — it exposes CAN interfaces as network devices (like `can0`, `vcan0`). `vcan0` is a virtual CAN interface for local testing without hardware.
