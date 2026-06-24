@@ -178,6 +178,24 @@
         </div>
 
         <div class="card">
+            <h2>alarm history</h2>
+            <div style="max-height: 300px; overflow-y: auto">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>time</th>
+                            <th>alarm</th>
+                            <th>severity</th>
+                            <th>details</th>
+                            <th>status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alarm-history-table"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
             <h2>logs</h2>
             <div style="margin-bottom: 8px">
                 service:
@@ -283,6 +301,7 @@
                 document.getElementById("stats").innerHTML = `
     <div class="card stat"><div class="value">${status.file_count}</div><div class="label">shared files</div></div>
     <div class="card stat"><div class="value">${status.total_readings}</div><div class="label">db readings</div></div>
+    <div class="card stat"><div class="value">${status.db_size_mb || 0}</div><div class="label">db size (MB)</div></div>
     <div class="card stat"><div class="value">${status.active_alarms}</div><div class="label">active alarms</div></div>
     <div class="card stat"><div class="value">${status.uptime}s</div><div class="label">uptime</div></div>
   `;
@@ -344,6 +363,23 @@
                         )
                         .join(" ");
                 }
+
+                const history = await fetch("/api/alarms/history/200")
+                    .then((r) => r.json())
+                    .catch(() => []);
+                const htbody = document.getElementById("alarm-history-table");
+                htbody.innerHTML = history
+                    .map(
+                        (a) =>
+                            `<tr>
+                        <td>${new Date(a.ts * 1000).toLocaleString()}</td>
+                        <td><strong>${a.name}</strong></td>
+                        <td><span class="badge badge-${a.severity}">${a.severity}</span></td>
+                        <td>${a.message || ""}</td>
+                        <td>${a.cleared ? "cleared" : "active"}</td>
+                    </tr>`,
+                    )
+                    .join("");
 
                 const logSel = document.getElementById("log-service");
                 const prev = logSel.value;

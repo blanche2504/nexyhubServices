@@ -7,15 +7,17 @@ from pathlib import Path
 
 
 class Database:
-    def __init__(self, db_path: str, retention_days: int = 30):
+    def __init__(self, db_path: str, retention_hours: int = 24):
         self._path = db_path
+        self._retention_hours = retention_hours
+        self._prune_counter = 0
         self._lock = threading.Lock()
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._init_schema()
-        self._start_cleanup(retention_days)
+        self._prune_if_needed(force=True)
 
     def _init_schema(self):
         with self._lock:
@@ -52,6 +54,7 @@ class Database:
                 (time.time(), source, key, value, text_value, unit),
             )
             self._conn.commit()
+        self._prune_if_needed()
 
     def insert_alarm(self, name: str, severity: str, message: str | None = None):
         with self._lock:
@@ -133,16 +136,41 @@ class Database:
             self._conn.execute("DELETE FROM alarms WHERE ts<? AND cleared=1", (cutoff,))
             self._conn.commit()
 
-    def _start_cleanup(self, retention_days: int):
-        def _loop():
-            while True:
-                time.sleep(3600)
-                try:
-                    self.delete_old_readings(retention_days)
-                except Exception:
-                    pass
-        t = threading.Thread(target=_loop, daemon=True)
-        t.start()
+    def prune_readings(self, hours: int | None = None) -> int:
+        cutoff = time.time() - (hours or self._retention_hours) * 3600
+        with self._lock:
+            deleted = self._conn.execute(
+                "DELETE FROM readings WHERE ts<?", (cutoff,)
+            ).rowcount
+            self._conn.execute("DELETE FROM alarms WHERE ts<? AND cleared=1", (cutoff,))
+            self._conn.execute("PRAGMA optimize")
+            self._conn.commit()
+            if deleted > 1000:
+                self._conn.execute("VACUUM")
+                self._conn.commit()
+            return deleted
+
+    def _prune_if_needed(self, force: bool = False):
+        self._prune_counter += 1
+        if force or self._prune_counter >= 500:
+            self._prune_counter = 0
+            self.prune_readings()
+
+    def count_readings(self, source: str | None = None) -> int:
+        with self._lock:
+            if source:
+                row = self._conn.execute(
+                    "SELECT COUNT(*) FROM readings WHERE source=?", (source,)
+                ).fetchone()
+            else:
+                row = self._conn.execute("SELECT COUNT(*) FROM readings").fetchone()
+            return row[0]
+
+    def db_size(self) -> int:
+        try:
+            return os.path.getsize(self._path)
+        except Exception:
+            return 0
 
     def close(self):
         self._conn.close()

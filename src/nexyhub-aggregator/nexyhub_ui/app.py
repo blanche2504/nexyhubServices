@@ -53,7 +53,7 @@ def api_services():
             "label": label,
             "alive": age is not None and age < SERVICE_TIMEOUT,
             "last_seen": round(age, 1) if age is not None else None,
-            "readings": db.get_reading_count(source=src) if db else 0,
+            "readings": db.count_readings(source=src) if db else 0,
         }
 
     # check shared memory files
@@ -95,13 +95,15 @@ def api_status():
     readings = db.get_readings(limit=1) if db else []
     alarm_count = len(db.get_active_alarms()) if db else 0
     keys = list_keys()
+    db_size_mb = round(db.db_size() / (1024 * 1024), 1) if db else 0
     return jsonify({
         "uptime": round(time.time() - start_time, 1),
         "shared_dir": str(SHARED_DIR),
         "file_count": len(keys),
         "files": keys,
         "active_alarms": alarm_count,
-        "total_readings": db.get_reading_count() if db else 0,
+        "total_readings": db.count_readings() if db else 0,
+        "db_size_mb": db_size_mb,
     })
 
 
@@ -132,6 +134,15 @@ def api_alarms():
         "active": db.get_active_alarms(),
         "history": db.get_alarm_history(limit=50),
     })
+
+
+@app.route("/api/alarms/history")
+@app.route("/api/alarms/history/<int:limit>")
+def api_alarms_history(limit=200):
+    db = get_db()
+    if not db:
+        return jsonify([])
+    return jsonify(db.get_alarm_history(limit=limit))
 
 
 @app.route("/api/data/<path:key>")

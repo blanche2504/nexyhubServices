@@ -1,5 +1,6 @@
 #!/bin/sh
 # simulate production environment locally
+# no docker-compose -- all params set via docker run flags
 # matches how the luci web interface configures containers
 
 set -e
