@@ -4,11 +4,13 @@ LABEL maintainer="developer"
 LABEL description="Container CAN bus Monitor per NexyHub Air"
 LABEL version="1.0"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN touch /etc/ssh/ssh_host_rsa_key /etc/ssh/ssh_host_ecdsa_key /etc/ssh/ssh_host_ed25519_key 2>/dev/null; \
+    apt-get update && apt-get install -y --no-install-recommends \
     openssh-server \
     iproute2 \
     && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /var/run/sshd /docker-entrypoint.d
+    && mkdir -p /var/run/sshd /docker-entrypoint.d \
+    && rm -f /etc/ssh/ssh_host_*
 
 COPY src/nexyhub-can/sshd_config /etc/ssh/sshd_config
 COPY src/nexyhub-can/init-ssh.sh /docker-entrypoint.d/00-ssh.sh

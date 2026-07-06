@@ -52,6 +52,72 @@ bash run.sh simulate
 bash run.sh stop
 ```
 
+## Deploy on NexyHub (LuCI)
+
+Export images and upload via LuCI → Container panel:
+
+```bash
+bash run.sh export
+```
+
+### Container settings (LuCI)
+
+All containers use bridge `nexy_dev_bridge` and share `/shared`.
+
+#### Slot 1 — CAN (nexyhub-can)
+
+Port: `223:22` · CAN peripheral: `can0` @ 125000
+
+```
+NEXYHUB_DB_PATH=/shared/nexyhub.db
+NEXYHUB_SHARED_DIR=/shared
+SSH_ROOT_PASSWORD=admin
+CAN_INTERFACE=can0
+```
+
+Optional: `CAN_BITRATE=125000`, `CAN_RETRY_SEC=3`, `CAN_FILTER_IDS=` (empty = all)
+
+#### Slot 2 — Serial (nexyhub-serial)
+
+Port: `224:22`
+
+```
+NEXYHUB_DB_PATH=/shared/nexyhub.db
+NEXYHUB_SHARED_DIR=/shared
+SSH_ROOT_PASSWORD=admin
+SERIAL_PORT=/dev/ttyLP6
+```
+
+Optional: `BAUDRATE=9600`, `PARITY=N`, `STOPBITS=1`, `SERIAL_TIMEOUT=1.0`, `MODBUS_PORT=/dev/ttyLP2`, `MODBUS_BAUDRATE=9600`, `MODBUS_TIMEOUT=1.0`, `MODBUS_SLAVE_ID=1`, `MODBUS_REGISTER_ADDR=0`, `MODBUS_REGISTER_COUNT=1`, `MODBUS_POLL_SEC=10`, `GPIO_CHIP=/dev/gpiochip1`, `GPIO_DE_LINE=2`
+
+#### Slot 3 — BLE (nexyhub-ble)
+
+Port: `225:22` · Extra volume: `/run/dbus:/run/dbus`
+
+```
+NEXYHUB_DB_PATH=/shared/nexyhub.db
+NEXYHUB_SHARED_DIR=/shared
+SSH_ROOT_PASSWORD=admin
+```
+
+Optional: `BLE_ADAPTER=hci0`, `BLE_SCAN_SEC=10`, `BLE_POLL_SEC=10`, `BLE_SHARED_DIR=/mnt/shared`
+
+#### Slot 4 — Dashboard (nexyhub-ipc)
+
+Ports: `5000:5000`, `222:22`
+
+```
+NEXYHUB_DB_PATH=/shared/nexyhub.db
+NEXYHUB_SHARED_DIR=/shared
+SSH_ROOT_PASSWORD=admin
+```
+
+Optional: `FLASK_PORT=5000`, `SERVICE_TIMEOUT=120`
+
+> DB auto-prunes readings >24h old (every 500 inserts) to keep size manageable.
+
+> DB auto-prunes readings >24h old (every 500 inserts) to keep size manageable.
+
 single commands to run locally (without docker):
 
 ```bash
