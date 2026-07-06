@@ -1,13 +1,10 @@
 import os
 import time
-import signal
 import serial
 
 from nexyhub_config.loader import load_config
 from nexyhub_db.database import Database
-from nexyhub_alarms.engine import AlarmEngine
-from nexyhub_alarms.rules import AlarmRule
-from nexyhub_logs import log as file_log
+from nexyhub_utils.daemon import log, running, setup_signals, init_alarms, wait_for_path
 
 SERIAL_PORT = os.environ.get("SERIAL_PORT", "/dev/ttyLP2")
 BAUDRATE = int(os.environ.get("BAUDRATE", "9600"))
@@ -15,7 +12,7 @@ TIMEOUT = float(os.environ.get("SERIAL_TIMEOUT", "1.0"))
 GPIO_CHIP = os.environ.get("GPIO_CHIP", "/dev/gpiochip1")
 GPIO_DE_LINE = int(os.environ.get("GPIO_DE_LINE", "2"))
 
-running = True
+setup_signals()
 
 try:
     import gpiod
@@ -23,41 +20,9 @@ except ImportError:
     gpiod = None
 
 
-def log(level: str, msg: str) -> None:
-    ts = time.strftime("%H:%M:%S")
-    print(f"[{ts}] [{level}] {msg}", flush=True)
-    file_log("rs485", level, msg)
-
-
-def signal_handler(sig, frame) -> None:
-    global running
-    log("INFO", f"Received signal {sig}, shutdown...")
-    running = False
-
-
-signal.signal(signal.SIGTERM, signal_handler)
-signal.signal(signal.SIGINT, signal_handler)
-
-
-def wait_for_device(dev: str, timeout: int = 120) -> bool:
-    start = time.time()
-    while running:
-        if os.path.exists(dev):
-            log("INFO", f"Device {dev} found")
-            return True
-        elapsed = int(time.time() - start)
-        if elapsed >= timeout:
-            log("ERROR", f"{dev} not available after {timeout}s")
-            return False
-        if elapsed % 10 == 0 and elapsed > 0:
-            log("WAIT", f"Waiting for {dev}... ({elapsed}s)")
-        time.sleep(1)
-    return False
-
-
 def setup_gpio():
     if gpiod is None:
-        log("WARN", "libgpiod not available, DE control disabled")
+        log("rs485", "WARN", "libgpiod not available, DE control disabled")
         return None
     try:
         chip = gpiod.Chip(GPIO_CHIP)
@@ -66,21 +31,21 @@ def setup_gpio():
             output_value=gpiod.line.Value.INACTIVE,
         )
         req = chip.request_lines(config={GPIO_DE_LINE: config}, consumer="rs485-de")
-        log("INFO", f"GPIO DE on {GPIO_CHIP} line {GPIO_DE_LINE}")
+        log("rs485", "INFO", f"GPIO DE on {GPIO_CHIP} line {GPIO_DE_LINE}")
         return req
     except Exception as e:
-        log("WARN", f"GPIO setup failed: {e}")
+        log("rs485", "WARN", f"GPIO setup failed: {e}")
         return None
 
 
-def rs485_loop(ser, gpio_req=None, db=None, alarm_engine=None) -> None:
+def rs485_loop(ser: serial.Serial, gpio_req=None, db: Database | None = None, alarm_engine=None) -> None:
     while running:
         try:
             data = ser.readline()
             if not data:
                 continue
             text = data.decode("utf-8", errors="ignore").strip("\x00").strip()
-            log("RX", text)
+            log("rs485", "RX", text)
 
             if db:
                 db.insert_reading("serial", "rs485", text_value=text)
@@ -93,19 +58,19 @@ def rs485_loop(ser, gpio_req=None, db=None, alarm_engine=None) -> None:
                 time.sleep(10 / BAUDRATE)
                 if gpio_req is not None and gpiod is not None:
                     gpio_req.set_value(GPIO_DE_LINE, gpiod.line.Value.INACTIVE)
-                log("TX", "ACK")
+                log("rs485", "TX", "ACK")
                 if db:
                     db.insert_reading("serial", "rs485.ack", text_value="ACK")
 
             if alarm_engine:
                 events = alarm_engine.evaluate({"serial": {"rs485": text}})
                 for e in events:
-                    log(e["severity"].upper(), e["message"])
+                    log("rs485", e["severity"].upper(), e["message"])
                     if db:
                         db.insert_alarm(e["name"], e["severity"], e["message"])
 
         except (serial.SerialException, OSError) as e:
-            log("ERROR", f"Serial error: {e}")
+            log("rs485", "ERROR", f"Serial error: {e}")
             break
 
 
@@ -115,40 +80,32 @@ def main():
 
     db = None
     try:
-        db = Database(db_path)
-        log("INFO", f"DB logging to {db_path}")
+        db = Database(db_path, retention_days=cfg.logging_retention_days)
+        log("rs485", "INFO", f"DB logging to {db_path}")
     except Exception as e:
-        log("WARN", f"DB init failed: {e}")
+        log("rs485", "WARN", f"DB init failed: {e}")
 
-    alarm_engine = AlarmEngine()
-    for a in cfg.alarms:
-        try:
-            rule = AlarmRule(**{k: v for k, v in a.items() if k in ["name", "source", "field", "min", "max", "hysteresis", "severity"]})
-            alarm_engine.add_rule(rule)
-        except Exception as e:
-            log("WARN", f"Alarm rule '{a.get('name', '?')}' skipped: {e}")
-    if alarm_engine.rules:
-        log("INFO", f"Loaded {len(alarm_engine.rules)} alarm rules")
+    alarm_engine = init_alarms(cfg)
 
-    log("INFO", "=== nexyhub-rs485 monitor started ===")
-    log("INFO", f"Port: {SERIAL_PORT} @ {BAUDRATE} baud")
-    log("INFO", f"GPIO: {GPIO_CHIP} line {GPIO_DE_LINE}")
-    log("INFO", f"PID: {os.getpid()}")
+    log("rs485", "INFO", "=== nexyhub-rs485 monitor started ===")
+    log("rs485", "INFO", f"Port: {SERIAL_PORT} @ {BAUDRATE} baud")
+    log("rs485", "INFO", f"GPIO: {GPIO_CHIP} line {GPIO_DE_LINE}")
+    log("rs485", "INFO", f"PID: {os.getpid()}")
 
     while running:
-        log("INFO", f"Waiting for {SERIAL_PORT}...")
-        if not wait_for_device(SERIAL_PORT):
+        log("rs485", "INFO", f"Waiting for {SERIAL_PORT}...")
+        if not wait_for_path(SERIAL_PORT):
             if not running:
                 break
-            log("WARN", f"{SERIAL_PORT} not found, retrying in 3s...")
+            log("rs485", "WARN", f"{SERIAL_PORT} not found, retrying in 3s...")
             time.sleep(3)
             continue
 
         try:
             ser = serial.Serial(port=SERIAL_PORT, baudrate=BAUDRATE, timeout=TIMEOUT)
-            log("INFO", f"{SERIAL_PORT} opened")
+            log("rs485", "INFO", f"{SERIAL_PORT} opened")
         except serial.SerialException as e:
-            log("ERROR", f"Can't open {SERIAL_PORT}: {e}")
+            log("rs485", "ERROR", f"Can't open {SERIAL_PORT}: {e}")
             time.sleep(3)
             continue
 
@@ -161,13 +118,13 @@ def main():
         finally:
             try:
                 ser.close()
-                log("INFO", f"{SERIAL_PORT} closed")
+                log("rs485", "INFO", f"{SERIAL_PORT} closed")
             except Exception:
                 pass
 
     if db:
         db.close()
-    log("INFO", "=== nexyhub-rs485 monitor terminated ===")
+    log("rs485", "INFO", "=== nexyhub-rs485 monitor terminated ===")
 
 
 if __name__ == "__main__":

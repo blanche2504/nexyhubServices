@@ -1,15 +1,9 @@
 # test serial monitor - works on any platform by mocking pyserial
 
 import os
-import sys
 import unittest
 import serial
 from unittest.mock import patch, MagicMock
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-
-import serial
 
 
 class MockSerial:
@@ -81,19 +75,15 @@ class TestSerialEcho(unittest.TestCase):
         self.assertGreaterEqual(len(ser._written), 1)
 
     def test_wait_for_device_found(self):
-        # wait_for_device returns True when the device path exists
+        from nexyhub_utils.daemon import wait_for_path
         with patch("os.path.exists", return_value=True):
-            from nexyhub_serial.serial_echo import wait_for_device
-            result = wait_for_device("/dev/ttyLP6", timeout=1)
+            result = wait_for_path("/dev/ttyLP6", timeout=1)
             self.assertTrue(result)
 
     def test_wait_for_device_not_found(self):
-        # wait_for_device returns False when the device path never appears
+        from nexyhub_utils.daemon import wait_for_path
         with patch("os.path.exists", return_value=False):
-            from nexyhub_serial.serial_echo import wait_for_device
-            import nexyhub_serial.serial_echo as mod
-            mod.running = False
-            result = wait_for_device("/dev/ttyLP6", timeout=1)
+            result = wait_for_path("/dev/ttyLP6", timeout=1)
             self.assertFalse(result)
 
 
@@ -146,8 +136,7 @@ class TestModbusRTU(unittest.TestCase):
     def test_modbus_main_no_device(self):
         # modbus_rtu.main does not crash when the serial device does not exist
         import nexyhub_serial.modbus_rtu as mod
-        mod.running = False
-        with patch("os.path.exists", return_value=False):
+        with patch("nexyhub_serial.modbus_rtu.running", False), patch("os.path.exists", return_value=False):
             try:
                 mod.main()
             except Exception as e:

@@ -1,39 +1,20 @@
 import os
 import json
 import time
-import signal
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
 from nexyhub_ipc.shared_mem import atomic_read, list_keys, SHARED_DIR
+from nexyhub_utils.daemon import log, running, setup_signals
 
 CONSUMER_PORT = int(os.environ.get("IPC_CONSUMER_PORT", "8000"))
 
-running = True
-
-
-def log(level: str, msg: str) -> None:
-    ts = time.strftime("%H:%M:%S")
-    print(f"[{ts}] [{level}] {msg}", flush=True)
-
-
-def setup_signals():
-    try:
-        signal.signal(signal.SIGTERM, _handler)
-        signal.signal(signal.SIGINT, _handler)
-    except ValueError:
-        pass
-
-
-def _handler(sig, frame):
-    global running
-    log("INFO", f"Received signal {sig}, shutdown...")
-    running = False
+setup_signals()
 
 
 class IPCRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
-        log("HTTP", f"{self.client_address[0]} - {fmt % args}")
+        log("http", "HTTP", f"{self.client_address[0]} - {fmt % args}")
 
     def _send_json(self, data: object, status: int = 200):
         body = json.dumps(data).encode("utf-8")
@@ -81,14 +62,13 @@ def create_server(port: int | None = None) -> HTTPServer:
 
 
 def main() -> None:
-    setup_signals()
-    log("INFO", "=== nexyhub-ipc consumer started ===")
-    log("INFO", f"Shared dir: {SHARED_DIR}")
-    log("INFO", f"Listening on port {CONSUMER_PORT}")
-    log("INFO", f"PID: {os.getpid()}")
+    log("ipc", "INFO", "=== nexyhub-ipc consumer started ===")
+    log("ipc", "INFO", f"Shared dir: {SHARED_DIR}")
+    log("ipc", "INFO", f"Listening on port {CONSUMER_PORT}")
+    log("ipc", "INFO", f"PID: {os.getpid()}")
 
     server = create_server()
-    log("INFO", f"HTTP server ready on http://0.0.0.0:{CONSUMER_PORT}/")
+    log("ipc", "INFO", f"HTTP server ready on http://0.0.0.0:{CONSUMER_PORT}/")
 
     try:
         while running:
@@ -96,10 +76,10 @@ def main() -> None:
             server.handle_request()
     except Exception as e:
         if running:
-            log("ERROR", f"Server error: {e}")
+            log("ipc", "ERROR", f"Server error: {e}")
     finally:
         server.server_close()
-        log("INFO", "=== nexyhub-ipc consumer terminated ===")
+        log("ipc", "INFO", "=== nexyhub-ipc consumer terminated ===")
 
 
 if __name__ == "__main__":

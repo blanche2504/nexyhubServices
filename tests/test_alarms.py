@@ -1,8 +1,4 @@
-import os
-import sys
 import unittest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from nexyhub_alarms.rules import AlarmRule, AlarmState
 from nexyhub_alarms.engine import AlarmEngine

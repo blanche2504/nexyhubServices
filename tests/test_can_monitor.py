@@ -1,10 +1,6 @@
-import os
-import sys
 import unittest
 from unittest.mock import patch, MagicMock
 import can
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from nexyhub_can.filters import parse_filters
 from nexyhub_can.socketcan import send_message, recv_message, create_bus

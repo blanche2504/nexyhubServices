@@ -4,65 +4,58 @@ import yaml
 from nexyhub_config.schema import DEFAULT_CONFIG, DEFAULT_CONFIG_PATH, merge
 
 
+_ATTRS = {
+    "can_interface": ("can", "interface"),
+    "can_bitrate": ("can", "bitrate"),
+    "can_filters": ("can", "filters"),
+    "serial_rs232_port": ("serial", "rs232", "port"),
+    "serial_rs232_baudrate": ("serial", "rs232", "baudrate"),
+    "serial_rs485_port": ("serial", "rs485", "port"),
+    "serial_rs485_baudrate": ("serial", "rs485", "baudrate"),
+    "ble_adapter": ("ble", "adapter"),
+    "ble_scan_sec": ("ble", "scan_sec"),
+    "ble_poll_sec": ("ble", "poll_sec"),
+    "alarms": ("alarms",),
+    "logging_db_path": ("logging", "db_path"),
+    "logging_retention_days": ("logging", "retention_days"),
+    "logging_batch_interval": ("logging", "batch_interval"),
+}
+
+_DEFAULTS = {
+    "can_interface": "can0",
+    "can_bitrate": 500000,
+    "can_filters": [],
+    "serial_rs232_port": "/dev/ttyLP6",
+    "serial_rs232_baudrate": 9600,
+    "serial_rs485_port": "/dev/ttyLP2",
+    "serial_rs485_baudrate": 9600,
+    "ble_adapter": "hci0",
+    "ble_scan_sec": 10,
+    "ble_poll_sec": 10,
+    "alarms": [],
+    "logging_db_path": "/mnt/shared/nexyhub.db",
+    "logging_retention_days": 30,
+    "logging_batch_interval": 10,
+}
+
+
 class Config:
     def __init__(self, data: dict):
         self._data = data
 
-    @property
-    def can_interface(self) -> str:
-        return self._data.get("can", {}).get("interface", "can0")
-
-    @property
-    def can_bitrate(self) -> int:
-        return self._data.get("can", {}).get("bitrate", 500000)
-
-    @property
-    def can_filters(self) -> list:
-        return self._data.get("can", {}).get("filters", [])
-
-    @property
-    def serial_rs232_port(self) -> str:
-        return self._data.get("serial", {}).get("rs232", {}).get("port", "/dev/ttyLP6")
-
-    @property
-    def serial_rs232_baudrate(self) -> int:
-        return self._data.get("serial", {}).get("rs232", {}).get("baudrate", 9600)
-
-    @property
-    def serial_rs485_port(self) -> str:
-        return self._data.get("serial", {}).get("rs485", {}).get("port", "/dev/ttyLP2")
-
-    @property
-    def serial_rs485_baudrate(self) -> int:
-        return self._data.get("serial", {}).get("rs485", {}).get("baudrate", 9600)
-
-    @property
-    def ble_adapter(self) -> str:
-        return self._data.get("ble", {}).get("adapter", "hci0")
-
-    @property
-    def ble_scan_sec(self) -> int:
-        return self._data.get("ble", {}).get("scan_sec", 10)
-
-    @property
-    def ble_poll_sec(self) -> int:
-        return self._data.get("ble", {}).get("poll_sec", 10)
-
-    @property
-    def alarms(self) -> list:
-        return self._data.get("alarms", [])
-
-    @property
-    def logging_db_path(self) -> str:
-        return self._data.get("logging", {}).get("db_path", "/mnt/shared/nexyhub.db")
-
-    @property
-    def logging_retention_days(self) -> int:
-        return self._data.get("logging", {}).get("retention_days", 30)
-
-    @property
-    def logging_batch_interval(self) -> int:
-        return self._data.get("logging", {}).get("batch_interval", 10)
+    def __getattr__(self, name: str):
+        if name.startswith("_") or name not in _ATTRS:
+            raise AttributeError(name)
+        keys = _ATTRS[name]
+        val = self._data
+        for k in keys:
+            if isinstance(val, dict):
+                val = val.get(k)
+                if val is None:
+                    return _DEFAULTS.get(name)
+            else:
+                return _DEFAULTS.get(name)
+        return val
 
     def raw(self) -> dict:
         return dict(self._data)

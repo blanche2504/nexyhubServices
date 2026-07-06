@@ -17,7 +17,7 @@ SERVICE_TIMEOUT = int(os.environ.get("SERVICE_TIMEOUT", "120"))
 
 def get_db():
     try:
-        return Database(DB_PATH)
+        return Database(DB_PATH, retention_days=30)
     except Exception:
         return None
 
@@ -53,7 +53,7 @@ def api_services():
             "label": label,
             "alive": age is not None and age < SERVICE_TIMEOUT,
             "last_seen": round(age, 1) if age is not None else None,
-            "readings": len(db.get_readings(source=src, limit=10000)) if db else 0,
+            "readings": db.get_reading_count(source=src) if db else 0,
         }
 
     # check shared memory files
@@ -101,7 +101,7 @@ def api_status():
         "file_count": len(keys),
         "files": keys,
         "active_alarms": alarm_count,
-        "total_readings": len(db.get_readings(limit=10000)) if db else 0,
+        "total_readings": db.get_reading_count() if db else 0,
     })
 
 

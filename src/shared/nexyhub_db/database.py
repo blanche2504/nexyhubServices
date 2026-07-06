@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 class Database:
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, retention_days: int = 30):
         self._path = db_path
         self._lock = threading.Lock()
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -15,6 +15,7 @@ class Database:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._init_schema()
+        self._start_cleanup(retention_days)
 
     def _init_schema(self):
         with self._lock:
@@ -67,6 +68,16 @@ class Database:
                 (name,),
             )
             self._conn.commit()
+
+    def get_reading_count(self, source: str | None = None) -> int:
+        with self._lock:
+            parts = ["SELECT COUNT(*) FROM readings"]
+            params = []
+            if source:
+                parts.append("WHERE source=?")
+                params.append(source)
+            row = self._conn.execute(" ".join(parts), params).fetchone()
+            return row[0] if row else 0
 
     def get_readings(self, source: str | None = None, key: str | None = None,
                      limit: int = 100, since: float | None = None) -> list[dict]:
@@ -121,6 +132,17 @@ class Database:
             self._conn.execute("DELETE FROM readings WHERE ts<?", (cutoff,))
             self._conn.execute("DELETE FROM alarms WHERE ts<? AND cleared=1", (cutoff,))
             self._conn.commit()
+
+    def _start_cleanup(self, retention_days: int):
+        def _loop():
+            while True:
+                time.sleep(3600)
+                try:
+                    self.delete_old_readings(retention_days)
+                except Exception:
+                    pass
+        t = threading.Thread(target=_loop, daemon=True)
+        t.start()
 
     def close(self):
         self._conn.close()

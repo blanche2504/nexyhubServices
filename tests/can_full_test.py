@@ -12,14 +12,11 @@ Tests:
 """
 
 import os
-import sys
 import time
 import subprocess
 import threading
 from unittest.mock import MagicMock
 import can
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 PASS = 0
 FAIL = 0

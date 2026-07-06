@@ -1,14 +1,12 @@
 import os
 import json
-import time
-import signal
 import asyncio
 import argparse
 from pathlib import Path
 
 from nexyhub_config.loader import load_config
 from nexyhub_db.database import Database
-from nexyhub_logs import log as file_log
+from nexyhub_utils.daemon import log, running, setup_signals, wait_for_path
 
 BLE_ADAPTER = os.environ.get("BLE_ADAPTER", "hci0")
 SCAN_SEC = int(os.environ.get("BLE_SCAN_SEC", "10"))
@@ -17,7 +15,7 @@ POLL_SEC = int(os.environ.get("BLE_POLL_SEC", "10"))
 
 DESCRIPTION = "NexyHub BLE Scanner --- periodic Bluetooth Low Energy discovery"
 
-running = True
+setup_signals()
 
 try:
     from bleak import BleakScanner
@@ -25,30 +23,14 @@ except ImportError:
     BleakScanner = None
 
 
-def log(level: str, msg: str) -> None:
-    ts = time.strftime("%H:%M:%S")
-    print(f"[{ts}] [{level}] {msg}", flush=True)
-    file_log("ble", level, msg)
-
-
-def signal_handler(sig, frame) -> None:
-    global running
-    log("INFO", f"Received signal {sig}, shutdown...")
-    running = False
-
-
-signal.signal(signal.SIGTERM, signal_handler)
-signal.signal(signal.SIGINT, signal_handler)
-
-
 def write_devices(devices: list, dest: Path) -> None:
     tmp = dest.with_suffix(".tmp")
     try:
         tmp.write_text(json.dumps(devices, indent=2), encoding="utf-8")
         tmp.rename(dest)
-        log("INFO", f"Wrote {len(devices)} devices to {dest}")
+        log("ble", "INFO", f"Wrote {len(devices)} devices to {dest}")
     except Exception as e:
-        log("ERROR", f"Write failed: {e}")
+        log("ble", "ERROR", f"Write failed: {e}")
 
 
 def format_device(device) -> dict:
@@ -62,47 +44,30 @@ def format_device(device) -> dict:
 
 async def scan_once() -> list:
     if BleakScanner is None:
-        log("ERROR", "bleak not installed")
+        log("ble", "ERROR", "bleak not installed")
         return []
-    log("INFO", f"BLE scan on {BLE_ADAPTER} ({SCAN_SEC}s)...")
+    log("ble", "INFO", f"BLE scan on {BLE_ADAPTER} ({SCAN_SEC}s)...")
     try:
         devices = await BleakScanner.discover(timeout=SCAN_SEC, adapter=BLE_ADAPTER)
         result = [format_device(d) for d in devices]
-        log("INFO", f"Found {len(result)} devices")
+        log("ble", "INFO", f"Found {len(result)} devices")
         return result
     except Exception as e:
-        log("ERROR", f"Scan failed: {e}")
+        log("ble", "ERROR", f"Scan failed: {e}")
         return []
 
 
-def wait_for_adapter(adapter: str, timeout: int = 120) -> bool:
-    start = time.time()
-    while running:
-        path = f"/sys/class/bluetooth/{adapter}"
-        if os.path.exists(path):
-            log("INFO", f"Adapter {adapter} found")
-            return True
-        elapsed = int(time.time() - start)
-        if elapsed >= timeout:
-            log("ERROR", f"{adapter} not available after {timeout}s")
-            return False
-        if elapsed % 10 == 0 and elapsed > 0:
-            log("WAIT", f"Waiting for {adapter}... ({elapsed}s)")
-        time.sleep(1)
-    return False
-
-
 async def main_loop(db=None):
-    log("INFO", "=== nexyhub-ble scanner started ===")
-    log("INFO", f"Adapter: {BLE_ADAPTER}")
-    log("INFO", f"Scan: {SCAN_SEC}s, Poll: {POLL_SEC}s")
-    log("INFO", f"Shared dir: {SHARED_DIR}")
+    log("ble", "INFO", "=== nexyhub-ble scanner started ===")
+    log("ble", "INFO", f"Adapter: {BLE_ADAPTER}")
+    log("ble", "INFO", f"Scan: {SCAN_SEC}s, Poll: {POLL_SEC}s")
+    log("ble", "INFO", f"Shared dir: {SHARED_DIR}")
 
     if BleakScanner is None:
-        log("ERROR", "Install bleak: pip install bleak")
+        log("ble", "ERROR", "Install bleak: pip install bleak")
         return
 
-    if not wait_for_adapter(BLE_ADAPTER):
+    if not wait_for_path(f"/sys/class/bluetooth/{BLE_ADAPTER}", label=BLE_ADAPTER):
         return
 
     output = Path(SHARED_DIR) / "ble_devices.json"
@@ -115,13 +80,13 @@ async def main_loop(db=None):
                 for d in devices:
                     db.insert_reading("ble", d["address"], text_value=d["name"])
             if running:
-                log("INFO", f"Next scan in {POLL_SEC}s...")
+                log("ble", "INFO", f"Next scan in {POLL_SEC}s...")
                 for _ in range(POLL_SEC):
                     if not running:
                         break
                     await asyncio.sleep(1)
 
-    log("INFO", "=== nexyhub-ble scanner terminated ===")
+    log("ble", "INFO", "=== nexyhub-ble scanner terminated ===")
 
 
 def main():
@@ -141,10 +106,10 @@ def main():
     db = None
     try:
         db_path = os.environ.get("NEXYHUB_DB_PATH") or cfg.logging_db_path
-        db = Database(db_path)
-        log("INFO", f"DB logging to {db_path}")
+        db = Database(db_path, retention_days=cfg.logging_retention_days)
+        log("ble", "INFO", f"DB logging to {db_path}")
     except Exception as e:
-        log("WARN", f"DB init failed: {e}")
+        log("ble", "WARN", f"DB init failed: {e}")
 
     asyncio.run(main_loop(db=db))
 

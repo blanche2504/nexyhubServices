@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import time
 import shutil
@@ -9,8 +8,6 @@ import threading
 from pathlib import Path
 from http.client import HTTPConnection
 from http.server import HTTPServer
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 class TestSharedMem(unittest.TestCase):

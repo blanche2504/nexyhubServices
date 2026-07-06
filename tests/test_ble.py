@@ -1,15 +1,12 @@
 # test BLE scanner - works on any platform by mocking bleak
 
 import os
-import sys
 import json
 import asyncio
 import unittest
 from unittest.mock import patch, MagicMock, AsyncMock
 from pathlib import Path
 import tempfile
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 class FakeDevice:
@@ -62,25 +59,19 @@ class TestBLEScanner(unittest.TestCase):
             self.assertTrue(dest.exists())
 
     def test_wait_for_adapter_found(self):
-        # wait_for_adapter returns True when the adapter path exists
-        import nexyhub_ble.ble_scanner as mod
-        saved_running = mod.running
-        mod.running = True
+        from nexyhub_utils.daemon import wait_for_path, running
+        saved = running
         try:
             with patch("os.path.exists", return_value=True):
-                from nexyhub_ble.ble_scanner import wait_for_adapter
-                result = wait_for_adapter("hci0", timeout=1)
+                result = wait_for_path("/sys/class/bluetooth/hci0", timeout=1)
                 self.assertTrue(result)
         finally:
-            mod.running = saved_running
+            globals()["running"] = saved
 
     def test_wait_for_adapter_not_found(self):
-        # wait_for_adapter returns False when the adapter path never appears
+        from nexyhub_utils.daemon import wait_for_path
         with patch("os.path.exists", return_value=False):
-            from nexyhub_ble.ble_scanner import wait_for_adapter
-            import nexyhub_ble.ble_scanner as mod
-            mod.running = False
-            result = wait_for_adapter("hci0", timeout=1)
+            result = wait_for_path("/sys/class/bluetooth/hci0", timeout=1)
             self.assertFalse(result)
 
     def test_bleak_import(self):
@@ -116,7 +107,7 @@ class TestBLEScanner(unittest.TestCase):
         import nexyhub_ble.ble_scanner as mod
         saved_running = mod.running
         try:
-            with patch.object(mod, "wait_for_adapter", return_value=True):
+            with patch("os.path.exists", return_value=True):
                 with patch.object(mod, "BleakScanner") as mock_bleak:
                     mock_bleak.discover = AsyncMock(return_value=[
                         FakeDevice(name="B1", address="AA:BB:CC:DD:EE:03"),

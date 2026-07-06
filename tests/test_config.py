@@ -1,9 +1,6 @@
 import os
-import sys
 import tempfile
 import unittest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from nexyhub_config.loader import load_config, read_config, Config
 
