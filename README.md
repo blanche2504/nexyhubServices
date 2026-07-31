@@ -71,7 +71,6 @@ Port: `223:22` · CAN peripheral: `can0` @ 125000
 ```
 NEXYHUB_DB_PATH=/shared/nexyhub.db
 NEXYHUB_SHARED_DIR=/shared
-SSH_ROOT_PASSWORD=admin
 CAN_INTERFACE=can0
 ```
 
@@ -109,7 +108,6 @@ Ports: `5000:5000`, `222:22`
 ```
 NEXYHUB_DB_PATH=/shared/nexyhub.db
 NEXYHUB_SHARED_DIR=/shared
-SSH_ROOT_PASSWORD=admin
 ```
 
 Optional: `FLASK_PORT=5000`, `SERVICE_TIMEOUT=120`

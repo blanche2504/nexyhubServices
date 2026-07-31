@@ -7,9 +7,9 @@ from pathlib import Path
 
 
 class Database:
-    def __init__(self, db_path: str, retention_hours: int = 24):
+    def __init__(self, db_path: str, retention_days: int = 30):
         self._path = db_path
-        self._retention_hours = retention_hours
+        self._retention_hours = retention_days * 24
         self._prune_counter = 0
         self._lock = threading.Lock()
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -146,8 +146,11 @@ class Database:
             self._conn.execute("PRAGMA optimize")
             self._conn.commit()
             if deleted > 1000:
-                self._conn.execute("VACUUM")
-                self._conn.commit()
+                try:
+                    self._conn.execute("VACUUM")
+                    self._conn.commit()
+                except sqlite3.OperationalError:
+                    pass
             return deleted
 
     def _prune_if_needed(self, force: bool = False):

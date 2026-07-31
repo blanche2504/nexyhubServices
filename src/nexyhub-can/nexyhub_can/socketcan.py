@@ -21,7 +21,7 @@ def send_message(bus: can.Bus, arb_id: int, data: bytes) -> bool:
         return False
 
 
-def recv_message(bus: can.Bus) -> can.Message | None:
+def recv_message(bus) -> object:
     try:
         return bus.recv(timeout=1.0)
     except Exception:

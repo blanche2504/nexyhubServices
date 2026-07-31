@@ -8,6 +8,10 @@ set -e
 SHARED_DIR="${HOME}/nexyhub-shared"
 CONFIG_DIR="${HOME}/nexyhub-config"
 
+# default: cross-build for gateway (arm64); override for local dev
+PLATFORM="${PLATFORM:-linux/arm64}"
+BUILDER="${BUILDER:-arm64builder}"
+
 mkdir -p "${SHARED_DIR}" "${CONFIG_DIR}"
 
 # copy default config if not present
@@ -17,11 +21,15 @@ if [ ! -f "${CONFIG_DIR}/config.yaml" ]; then
 fi
 
 build_all() {
-    echo "building images..."
-    docker build -t nexyhub-can -f src/nexyhub-can/Dockerfile .
-    docker build -t nexyhub-serial -f src/nexyhub-serial/Dockerfile .
-    docker build -t nexyhub-ble -f src/nexyhub-ble/Dockerfile .
-    docker build -t nexyhub-ipc -f src/nexyhub-aggregator/Dockerfile .
+    echo "building images for ${PLATFORM}..."
+    docker buildx build --builder "${BUILDER}" --platform "${PLATFORM}" \
+        -t nexyhub-can -f src/nexyhub-can/Dockerfile --load .
+    docker buildx build --builder "${BUILDER}" --platform "${PLATFORM}" \
+        -t nexyhub-serial -f src/nexyhub-serial/Dockerfile --load .
+    docker buildx build --builder "${BUILDER}" --platform "${PLATFORM}" \
+        -t nexyhub-ble -f src/nexyhub-ble/Dockerfile --load .
+    docker buildx build --builder "${BUILDER}" --platform "${PLATFORM}" \
+        -t nexyhub-ipc -f src/nexyhub-aggregator/Dockerfile --load .
 }
 
 export_all() {
@@ -208,5 +216,8 @@ case "${1:-help}" in
         echo "  CAN_INTERFACE=vcan0 (default: can0)"
         echo "  SERIAL_PORT=...     (default: /dev/ttyLP6)"
         echo "  SERIAL_DEV=...      (simulate serial device, default: auto PTY peer)"
+        echo ""
+        echo "  PLATFORM=linux/amd64 (default: linux/arm64 — gateway target)"
+        echo "  BUILDER=default      (default: arm64builder)"
         ;;
 esac

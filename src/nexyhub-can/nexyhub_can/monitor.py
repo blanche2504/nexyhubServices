@@ -1,5 +1,7 @@
 import os
 import time
+from typing import Optional
+
 import can
 
 from nexyhub_can.filters import parse_filters
@@ -37,7 +39,7 @@ def wait_for_interface(ifname: str, timeout: int = 120) -> bool:
     return False
 
 
-def can_loop(ifname: str, filters: list, bus: can.Bus | None = None, db: Database | None = None, alarm_engine=None) -> bool:
+def can_loop(ifname: str, filters: list, bus=None, db: Optional[Database] = None, alarm_engine=None) -> bool:
     bus = bus or create_bus(ifname, filters)
 
     try:
@@ -66,22 +68,25 @@ def can_loop(ifname: str, filters: list, bus: can.Bus | None = None, db: Databas
             if msg.data:
                 value = float(msg.data[0])
 
-            if db:
-                db.insert_reading("can", key, value=value, text_value=text)
+            try:
+                if db:
+                    db.insert_reading("can", key, value=value, text_value=text)
 
-            if "TESTCAN" in text.upper():
-                if send_message(bus, msg.arbitration_id, b"ACK"):
-                    log("can", "TX", f"{key} DATA=ACK")
-                    if db:
-                        db.insert_reading("can", f"{key}.ack", text_value="ACK")
+                if "TESTCAN" in text.upper():
+                    if send_message(bus, msg.arbitration_id, b"ACK"):
+                        log("can", "TX", f"{key} DATA=ACK")
+                        if db:
+                            db.insert_reading("can", f"{key}.ack", text_value="ACK")
 
-            if alarm_engine:
-                data = {"can": {key: text}}
-                events = alarm_engine.evaluate(data)
-                for e in events:
-                    log("can", e["severity"].upper(), e["message"])
-                    if db:
-                        db.insert_alarm(e["name"], e["severity"], e["message"])
+                if alarm_engine:
+                    data = {"can": {key: text}}
+                    events = alarm_engine.evaluate(data)
+                    for e in events:
+                        log("can", e["severity"].upper(), e["message"])
+                        if db:
+                            db.insert_alarm(e["name"], e["severity"], e["message"])
+            except Exception as e:
+                log("can", "WARN", f"DB/alarm processing failed: {e}")
 
     finally:
         bus.shutdown()
